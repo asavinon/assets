@@ -166,7 +166,7 @@
             <input type="number" id="off-takeout" step="any" min="0" value="0">
           </div>
           <div>
-            <label for="off-dia">Pipe diameter <span class="u">(in)</span> — for drawing only</label>
+            <label for="off-dia">Pipe diameter <span class="u">(in)</span> — synced across tabs</label>
             <input type="number" id="off-dia" step="any" min="0" value="8">
           </div>
         </div>
@@ -407,7 +407,8 @@
           Straight-duct friction uses the standard galvanized duct equation
           0.109136 × CFM<sup>1.9</sup> ÷ D<sup>5.02</sup> per 100 ft. A fitting's loss is its
           coefficient C × VP — smoother, longer-radius fittings have lower C. A rolling offset
-          has <strong>two</strong> fittings, so double the fitting loss.
+          has <strong>two</strong> fittings, so double the fitting loss. The pipe diameter is
+          synced with the other tabs — change it anywhere and this tab revalues.
         </div>
       </div>
 
@@ -1379,6 +1380,16 @@
 
   ["af-dia", "af-cfm"].forEach(function (id) { $(id).addEventListener("input", calcAirflow); });
   ["af-type", "af-angle"].forEach(function (id) { $(id).addEventListener("change", calcAirflow); });
+
+  // keep pipe diameter in sync across all tabs — change it anywhere, every tab revalues
+  var DIA_IDS = ["off-dia", "mi-dia", "to-dia", "af-dia"];
+  DIA_IDS.forEach(function (id) {
+    $(id).addEventListener("input", function () {
+      var v = this.value;
+      DIA_IDS.forEach(function (other) { if (other !== id) $(other).value = v; });
+      calcOffset(); calcMiter(); calcTakeout(); calcAirflow();
+    });
+  });
 
   calcOffset();
   calcMiter();

@@ -32,6 +32,18 @@ Generates a wrap-around cut layout for cutting round pipe at any angle:
   length (`throat + D × tan(cut)`).
 - Printable cut sheet.
 
+### Fitting Take-Out
+Calculates a fitting's take-out from its actual geometry — enter the fitting
+angle, pipe diameter, and either the **throat radius** or the **centerline
+radius** (CLR = throat radius + D ÷ 2), plus an optional straight collar length:
+
+- **Take-out** — end of fitting to centerline intersection:
+  `CLR × tan(angle ÷ 2) + collar`
+- Throat / centerline / heel radii and arc lengths through the fitting
+- One-tap button copies the take-out into the Rolling Offset tab so the
+  travel piece cut length uses real fitting dimensions
+- Dimensioned elbow diagram
+
 Units toggle between inches (with nearest-1/16″ fractions) and millimeters.
 All results are centerline dimensions — allow for seams and connectors per shop
 practice.

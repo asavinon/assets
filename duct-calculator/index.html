@@ -115,6 +115,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="offset">Rolling Offset</button>
       <button class="tab-btn" data-tab="miter">Miter Cut Layout</button>
+      <button class="tab-btn" data-tab="takeout">Fitting Take-Out</button>
     </div>
     <div class="unit-toggle">
       <button id="unit-in" class="active">inches</button>
@@ -253,10 +254,81 @@
     </div>
   </div>
 
+  <!-- ============ FITTING TAKE-OUT ============ -->
+  <div class="tab" id="tab-takeout">
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+        <label for="to-angle">Fitting angle</label>
+        <select id="to-angle">
+          <option value="90">90°</option>
+          <option value="60">60°</option>
+          <option value="45" selected>45°</option>
+          <option value="30">30°</option>
+          <option value="22.5">22½°</option>
+          <option value="15">15°</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div id="to-custom-wrap" style="display:none">
+          <label for="to-custom">Custom angle (degrees)</label>
+          <input type="number" id="to-custom" step="any" min="0.1" max="90" value="45">
+        </div>
+        <div class="row2">
+          <div>
+            <label for="to-dia">Pipe diameter <span class="u">(in)</span></label>
+            <input type="number" id="to-dia" step="any" min="0.1" value="8">
+          </div>
+          <div>
+            <label for="to-rtype">Which radius do you know?</label>
+            <select id="to-rtype">
+              <option value="throat" selected>Throat radius</option>
+              <option value="clr">Centerline radius (CLR)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="to-radius" id="to-radius-label">Throat radius <span class="u">(in)</span></label>
+            <input type="number" id="to-radius" step="any" min="0" value="4">
+          </div>
+          <div>
+            <label for="to-tangent">Straight collar, each end <span class="u">(in)</span> — optional</label>
+            <input type="number" id="to-tangent" step="any" min="0" value="0">
+          </div>
+        </div>
+        <div class="err" id="to-err"></div>
+        <div class="hint">
+          The <strong>throat radius</strong> is the inside curve of the fitting; the
+          <strong>centerline radius</strong> runs down the middle of the pipe
+          (CLR = throat radius + D ÷ 2). If the fitting has a straight collar or
+          slip section past the curve, add its length — it extends the take-out.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+        <div class="results" id="to-results"></div>
+        <button class="btn" id="to-apply">Use this take-out in the Rolling Offset tab →</button>
+      </div>
+
+      <div class="card full">
+        <h2>Diagram</h2>
+        <svg id="to-svg" class="svgbox" viewBox="0 0 900 320" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hint">
+          <strong>Take-out</strong> is measured from the end of the fitting to the point where the
+          two centerlines would intersect. Travel and run are figured centerline-to-centerline, so
+          subtracting the take-out at each end gives the true cut length of the straight pipe
+          between fittings: cut length = travel − 2 × take-out.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     All results are centerline dimensions — allow for seams, connectors, and crimp as your shop practice requires.<br>
     Formulas: true offset = √(rise² + roll²) · travel = offset ÷ sin(angle) · run = offset ÷ tan(angle) ·
-    roll rotation = atan(roll ÷ rise) · miter rise at θ = R·tan(cut)·(1 − cos θ)
+    roll rotation = atan(roll ÷ rise) · miter rise at θ = R·tan(cut)·(1 − cos θ) ·
+    take-out = CLR·tan(angle ÷ 2) + collar
   </footer>
 </div>
 
@@ -304,7 +376,7 @@
   function setUnit(u) {
     if (u === unit) return;
     var f = u === "mm" ? 25.4 : 1 / 25.4;
-    ["off-rise", "off-roll", "off-takeout", "off-dia", "mi-dia"].forEach(function (id) {
+    ["off-rise", "off-roll", "off-takeout", "off-dia", "mi-dia", "mi-throat", "to-dia", "to-radius", "to-tangent"].forEach(function (id) {
       var el = $(id), v = parseFloat(el.value);
       if (isFinite(v)) el.value = +(v * f).toFixed(u === "mm" ? 1 : 3);
     });
@@ -313,7 +385,7 @@
     $("unit-mm").classList.toggle("active", u === "mm");
     var lbl = u === "mm" ? "(mm)" : "(in)";
     document.querySelectorAll("label .u").forEach(function (s) { s.textContent = lbl; });
-    calcOffset(); calcMiter();
+    calcOffset(); calcMiter(); calcTakeout();
   }
   $("unit-in").addEventListener("click", function () { setUnit("in"); });
   $("unit-mm").addEventListener("click", function () { setUnit("mm"); });
@@ -551,8 +623,160 @@
     calcMiter();
   });
 
+  // ========== FITTING TAKE-OUT ==========
+  function takeoutAngle() {
+    var sel = $("to-angle").value;
+    return sel === "custom" ? num("to-custom") : parseFloat(sel);
+  }
+
+  var lastTakeout = null;
+
+  function calcTakeout() {
+    var a = takeoutAngle(), dia = num("to-dia"), r = num("to-radius"),
+        collar = num("to-tangent") || 0, type = $("to-rtype").value;
+    var err = $("to-err"), out = $("to-results");
+    err.textContent = "";
+    lastTakeout = null;
+
+    if (!isFinite(dia) || dia <= 0) {
+      err.textContent = "Enter a pipe diameter greater than zero.";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+    if (!isFinite(a) || a <= 0 || a > 90) {
+      err.textContent = "Fitting angle must be between 0° and 90°.";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+    if (!isFinite(r) || r < 0 || (type === "clr" && r <= 0)) {
+      err.textContent = "Enter the radius (throat radius may be 0 for a tight miter elbow).";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+    if (collar < 0) collar = 0;
+
+    var clr = type === "clr" ? r : r + dia / 2;
+    var throatR = clr - dia / 2;
+    if (throatR < 0) {
+      err.textContent = "Centerline radius is smaller than the pipe radius — check the numbers.";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+
+    var aRad = a * D2R;
+    var takeout = clr * Math.tan(aRad / 2) + collar;
+    lastTakeout = takeout;
+
+    var html = "";
+    html += resultRow("Take-out (end of fitting to centerline intersection)", fmtLen(takeout), true);
+    html += resultRow("Centerline radius (CLR)", fmtLen(clr));
+    html += resultRow("Throat radius", fmtLen(throatR));
+    html += resultRow("Heel radius (CLR + D ÷ 2)", fmtLen(clr + dia / 2));
+    html += resultRow("Centerline arc length through the fitting", fmtLen(clr * aRad));
+    html += resultRow("Throat arc length", fmtLen(throatR * aRad));
+    html += resultRow("Heel arc length", fmtLen((clr + dia / 2) * aRad));
+    if (collar > 0) html += resultRow("Included straight collar, each end", fmtLen(collar));
+    out.innerHTML = html;
+
+    drawTakeout({ a: aRad, dia: dia, clr: clr, collar: collar, takeout: takeout });
+  }
+
+  function drawTakeout(d) {
+    var svg = $("to-svg");
+    if (!d) { svg.innerHTML = ""; return; }
+    var W = 900, H = 320, pad = 52;
+
+    // geometry in fitting units: O (centerline intersection) at origin, leg 1 along -x,
+    // leg 2 leaving at angle a upward; arc center C above tangent point P1
+    var T = d.clr * Math.tan(d.a / 2);
+    var cx = -T, cy = d.clr; // arc center
+    var rIn = d.clr - d.dia / 2, rOut = d.clr + d.dia / 2;
+
+    function arcPt(rad, th) { return [cx + rad * Math.sin(th), cy - rad * Math.cos(th)]; }
+    var dir2 = [Math.cos(d.a), Math.sin(d.a)];
+
+    // sample everything to find the bounding box
+    var pts = [[0, 0], [-(T + d.collar), -d.dia / 2], [-(T + d.collar), d.dia / 2]];
+    var steps = 24;
+    for (var i = 0; i <= steps; i++) {
+      var th = (d.a * i) / steps;
+      pts.push(arcPt(rIn, th), arcPt(rOut, th));
+    }
+    var e2c = arcPt(d.clr, d.a);
+    pts.push([e2c[0] + dir2[0] * d.collar + dir2[1] * d.dia / 2, e2c[1] + dir2[1] * d.collar - dir2[0] * d.dia / 2]);
+    pts.push([e2c[0] + dir2[0] * d.collar - dir2[1] * d.dia / 2, e2c[1] + dir2[1] * d.collar + dir2[0] * d.dia / 2]);
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    pts.forEach(function (p) {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    });
+    var sc = Math.min((W - 2 * pad) / Math.max(maxX - minX, 1e-6),
+                      (H - 2 * pad - 26) / Math.max(maxY - minY, 1e-6));
+    function X(p) { return pad + (p[0] - minX) * sc; }
+    function Y(p) { return H - pad - (p[1] - minY) * sc; } // flip y
+
+    function pathArc(rad) {
+      var s = "";
+      for (var i = 0; i <= steps; i++) {
+        var p = arcPt(rad, (d.a * i) / steps);
+        s += (i === 0 ? "M" : "L") + X(p).toFixed(1) + " " + Y(p).toFixed(1) + " ";
+      }
+      return s;
+    }
+
+    var s = "";
+    // pipe walls (throat + heel arcs) and end faces
+    s += '<path d="' + pathArc(rIn) + '" fill="none" stroke="#4fc3f7" stroke-width="2.5"/>';
+    s += '<path d="' + pathArc(rOut) + '" fill="none" stroke="#4fc3f7" stroke-width="2.5"/>';
+    var f1a = [-T - d.collar, -d.dia / 2], f1b = [-T - d.collar, d.dia / 2];
+    s += svgLine(X(f1a), Y(f1a), X(f1b), Y(f1b), "#6fe3a5", 3);
+    if (d.collar > 0) {
+      s += svgLine(X([-T, -d.dia / 2]), Y([-T, -d.dia / 2]), X(f1a), Y(f1a), "#4fc3f7", 2.5);
+      s += svgLine(X([-T, d.dia / 2]), Y([-T, d.dia / 2]), X(f1b), Y(f1b), "#4fc3f7", 2.5);
+    }
+    var p2i = arcPt(rIn, d.a), p2o = arcPt(rOut, d.a);
+    var f2i = [p2i[0] + dir2[0] * d.collar, p2i[1] + dir2[1] * d.collar];
+    var f2o = [p2o[0] + dir2[0] * d.collar, p2o[1] + dir2[1] * d.collar];
+    s += svgLine(X(f2i), Y(f2i), X(f2o), Y(f2o), "#6fe3a5", 3);
+    if (d.collar > 0) {
+      s += svgLine(X(p2i), Y(p2i), X(f2i), Y(f2i), "#4fc3f7", 2.5);
+      s += svgLine(X(p2o), Y(p2o), X(f2o), Y(f2o), "#4fc3f7", 2.5);
+    }
+    // centerline arc + dashed extensions to the intersection point O
+    s += '<path d="' + pathArc(d.clr) + '" fill="none" stroke="#f5a623" stroke-width="2" stroke-dasharray="7 5"/>';
+    s += svgLine(X([-T - d.collar, 0]), Y([-T - d.collar, 0]), X([0, 0]), Y([0, 0]), "#f5a623", 1.5, "7 5");
+    var e2 = arcPt(d.clr, d.a);
+    var e2f = [e2[0] + dir2[0] * d.collar, e2[1] + dir2[1] * d.collar];
+    s += svgLine(X(e2f), Y(e2f), X([0, 0]), Y([0, 0]), "#f5a623", 1.5, "7 5");
+    s += '<circle cx="' + X([0, 0]) + '" cy="' + Y([0, 0]) + '" r="5" fill="#f5a623"/>';
+    s += svgText(X([0, 0]) + 10, Y([0, 0]) + 4, "centerline intersection", "#f5a623", 12, "start");
+    // take-out dimension along leg 1
+    var dimY = Y([0, -d.dia / 2]) + 26;
+    s += svgLine(X(f1a), dimY, X([0, 0]), dimY, "#e8eef7", 1.5);
+    s += svgLine(X(f1a), dimY - 5, X(f1a), dimY + 5, "#e8eef7", 1.5);
+    s += svgLine(X([0, 0]), dimY - 5, X([0, 0]), dimY + 5, "#e8eef7", 1.5);
+    s += svgText((X(f1a) + X([0, 0])) / 2, dimY - 8, "take-out " + fmtLen(d.takeout).split(" (")[0], "#e8eef7", 13);
+    svg.innerHTML = s;
+  }
+
+  ["to-dia", "to-radius", "to-tangent", "to-custom"].forEach(function (id) {
+    $(id).addEventListener("input", calcTakeout);
+  });
+  $("to-angle").addEventListener("change", function () {
+    $("to-custom-wrap").style.display = this.value === "custom" ? "" : "none";
+    calcTakeout();
+  });
+  $("to-rtype").addEventListener("change", function () {
+    $("to-radius-label").innerHTML = (this.value === "clr" ? "Centerline radius (CLR) " : "Throat radius ") +
+      '<span class="u">(' + (unit === "mm" ? "mm" : "in") + ')</span>';
+    calcTakeout();
+  });
+  $("to-apply").addEventListener("click", function () {
+    if (lastTakeout === null) return;
+    $("off-takeout").value = +lastTakeout.toFixed(unit === "mm" ? 1 : 3);
+    calcOffset();
+    document.querySelector('[data-tab="offset"]').click();
+  });
+
   calcOffset();
   calcMiter();
+  calcTakeout();
 })();
 </script>
 </body>

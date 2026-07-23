@@ -59,6 +59,14 @@ Reference data for the size you're running:
 Reference values are typical — always verify against the current SMACNA HVAC
 Duct Construction Standards and project specs.
 
+### SMACNA reference
+Field-reference summaries from the SMACNA HVAC Duct Construction Standards
+world: what SMACNA is and which manuals apply, the pressure class → seal class
+table, leakage classes by seal class for round vs rectangular duct, and round
+duct rules of thumb (fitting gauges, hanger spacing, joint sealing, elbow
+construction by size). Summaries only — the current manual and project spec
+always govern.
+
 ### 3D views
 Every tab includes an interactive CAD-style 3D model rendered with a built-in
 software renderer (no libraries, works offline): the full rolling-offset

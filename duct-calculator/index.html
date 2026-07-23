@@ -123,6 +123,7 @@
       <button class="tab-btn" data-tab="miter">Miter Cut Layout</button>
       <button class="tab-btn" data-tab="takeout">Fitting Take-Out</button>
       <button class="tab-btn" data-tab="airflow">Airflow &amp; Gauges</button>
+      <button class="tab-btn" data-tab="smacna">SMACNA</button>
     </div>
     <div class="unit-toggle">
       <button id="unit-in" class="active">inches</button>
@@ -427,6 +428,86 @@
           and your project spec. Recommended velocities as a rule of thumb: residential branches
           600–900 FPM, residential mains 700–1200 FPM, commercial mains 1200–2000 FPM,
           commercial branches 800–1200 FPM, industrial dust/fume conveying 3500–4500 FPM.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SMACNA REFERENCE ============ -->
+  <div class="tab" id="tab-smacna">
+    <div class="grid">
+      <div class="card full">
+        <h2>What SMACNA is</h2>
+        <div class="hint" style="font-size:.9rem">
+          <strong>SMACNA</strong> — the Sheet Metal and Air Conditioning Contractors' National
+          Association — publishes the construction standards this trade builds to. The book that
+          governs nearly everything in this app is <strong>HVAC Duct Construction Standards —
+          Metal &amp; Flexible</strong> (ANSI/SMACNA 006), which covers gauges, joints, seams,
+          reinforcement, hangers, and sealing for rectangular, round, and oval duct. Related
+          manuals: <em>HVAC Air Duct Leakage Test Manual</em> and <em>HVAC Systems Duct Design</em>.
+          Standards, technical papers, and the store are at <strong>smacna.org</strong>. The tables
+          below are field-reference summaries of the commonly used values — the manual and your
+          project spec always govern.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Pressure class &amp; seal class</h2>
+        <table>
+          <thead><tr><th>Duct pressure class</th><th>Seal class</th><th>What gets sealed</th></tr></thead>
+          <tbody>
+            <tr><td>½″ and 1″ w.g.</td><td>C*</td><td>Transverse joints</td></tr>
+            <tr><td>2″ w.g.</td><td>C</td><td>Transverse joints</td></tr>
+            <tr><td>3″ w.g.</td><td>B</td><td>Transverse joints + longitudinal seams</td></tr>
+            <tr><td>4″, 6″, 10″ w.g.</td><td>A</td><td>Joints, seams, and all wall penetrations</td></tr>
+          </tbody>
+        </table>
+        <div class="hint">
+          *Historically unsealed unless specified — but modern energy codes (IECC/IMC, Title 24)
+          typically require sealing <strong>all</strong> duct regardless of pressure class, so in
+          practice: seal everything. Spiral lock seams don't require sealant; slip-fit fitting
+          joints get sealant plus fasteners.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Leakage class by seal class</h2>
+        <table>
+          <thead><tr><th>Seal class</th><th>Round &amp; flat oval duct</th><th>Rectangular duct</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>CL 3</td><td>CL 6</td></tr>
+            <tr><td>B</td><td>CL 6</td><td>CL 12</td></tr>
+            <tr><td>C</td><td>CL 12</td><td>CL 24</td></tr>
+          </tbody>
+        </table>
+        <div class="hint">
+          Leakage class CL = leakage in CFM per 100 sq ft of duct surface at 1″ w.g., per the
+          SMACNA <em>HVAC Air Duct Leakage Test Manual</em>. Lower is tighter — this is why
+          sealed spiral round (CL 3) is the tightest system you can hang, roughly 8× tighter
+          than minimally sealed rectangular.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Round duct field rules of thumb</h2>
+        <div class="results">
+          <div class="item"><span class="k">Gauge schedule</span>
+            <span class="v" style="font-size:.92rem">See the Airflow &amp; Gauges tab — typical for ±2″ w.g. single-wall spiral</span></div>
+          <div class="item"><span class="k">Negative pressure / higher class</span>
+            <span class="v" style="font-size:.92rem">Usually one to two gauges heavier — check the manual's negative-pressure tables</span></div>
+          <div class="item"><span class="k">Fittings</span>
+            <span class="v" style="font-size:.92rem">Commonly two gauges heavier than the connecting pipe</span></div>
+          <div class="item"><span class="k">Hangers &amp; supports</span>
+            <span class="v" style="font-size:.92rem">Typically max 12 ft spacing, straps/rods sized to diameter — SMACNA Ch. 5</span></div>
+          <div class="item"><span class="k">Fitting joints</span>
+            <span class="v" style="font-size:.92rem">Sealant on the male end, fasten per spec, pull sealant through the joint — don't just paint the outside</span></div>
+          <div class="item"><span class="k">Elbow construction</span>
+            <span class="v" style="font-size:.92rem">Die-stamped ≤ ~8″ · pleated/pressed mid sizes · gored (segmented) larger — gore count drives pressure loss</span></div>
+        </div>
+        <div class="hint">
+          These are the values crews use day to day. Anything structural — reinforcement,
+          internal supports, seismic, high-pressure class — comes straight out of the current
+          edition tables, not from memory or an app.
         </div>
       </div>
     </div>

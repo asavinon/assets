@@ -44,6 +44,21 @@ radius** (CLR = throat radius + D ÷ 2), plus an optional straight collar length
   travel piece cut length uses real fitting dimensions
 - Dimensioned elbow diagram
 
+### Airflow & Gauges
+Reference data for the size you're running:
+
+- **Velocity** from diameter + CFM (`V = CFM ÷ area`, shown in FPM and m/s),
+  velocity pressure (`VP = (V ÷ 4005)²`), and straight-duct friction per 100 ft
+  (standard galvanized duct equation `0.109136 × CFM^1.9 ÷ D^5.02`)
+- **Fitting pressure loss** — approximate loss coefficients (C) for pressed,
+  5-gore, 3-gore, and mitered elbows at any standard angle, times VP
+- **CFM capacity** of the pipe at 1000 / 1500 / 2000 FPM
+- **Typical spiral pipe gauge schedule** (galvanized, SMACNA-style) with the
+  current diameter highlighted, plus rule-of-thumb velocity ranges
+
+Reference values are typical — always verify against the current SMACNA HVAC
+Duct Construction Standards and project specs.
+
 ### 3D views
 Every tab includes an interactive CAD-style 3D model rendered with a built-in
 software renderer (no libraries, works offline): the full rolling-offset

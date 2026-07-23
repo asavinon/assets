@@ -122,6 +122,7 @@
       <button class="tab-btn active" data-tab="offset">Rolling Offset</button>
       <button class="tab-btn" data-tab="miter">Miter Cut Layout</button>
       <button class="tab-btn" data-tab="takeout">Fitting Take-Out</button>
+      <button class="tab-btn" data-tab="airflow">Airflow &amp; Gauges</button>
     </div>
     <div class="unit-toggle">
       <button id="unit-in" class="active">inches</button>
@@ -361,6 +362,76 @@
     </div>
   </div>
 
+  <!-- ============ AIRFLOW & GAUGES ============ -->
+  <div class="tab" id="tab-airflow">
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+        <div class="row2">
+          <div>
+            <label for="af-dia">Pipe diameter <span class="u">(in)</span></label>
+            <input type="number" id="af-dia" step="any" min="1" value="8">
+          </div>
+          <div>
+            <label for="af-cfm">Airflow (CFM)</label>
+            <input type="number" id="af-cfm" step="any" min="0" value="500">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="af-type">Fitting type (for pressure loss)</label>
+            <select id="af-type">
+              <option value="smooth" selected>Pressed / smooth elbow (R/D ≈ 1.5)</option>
+              <option value="gore5">Gored elbow — 5 piece</option>
+              <option value="gore3">Gored elbow — 3 piece</option>
+              <option value="miter">Mitered elbow (single cut)</option>
+            </select>
+          </div>
+          <div>
+            <label for="af-angle">Fitting angle</label>
+            <select id="af-angle">
+              <option value="90" selected>90°</option>
+              <option value="60">60°</option>
+              <option value="45">45°</option>
+              <option value="30">30°</option>
+              <option value="22.5">22½°</option>
+              <option value="15">15°</option>
+            </select>
+          </div>
+        </div>
+        <div class="err" id="af-err"></div>
+        <div class="hint">
+          <strong>How this works:</strong> the duct's cross-section area (sq ft) comes from the
+          diameter; velocity = CFM ÷ area. Velocity pressure VP = (V ÷ 4005)² in inches w.g.
+          Straight-duct friction uses the standard galvanized duct equation
+          0.109136 × CFM<sup>1.9</sup> ÷ D<sup>5.02</sup> per 100 ft. A fitting's loss is its
+          coefficient C × VP — smoother, longer-radius fittings have lower C. A rolling offset
+          has <strong>two</strong> fittings, so double the fitting loss.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+        <div class="results" id="af-results"></div>
+      </div>
+
+      <div class="card full">
+        <h2 class="warn">Typical spiral pipe gauge schedule (galvanized)</h2>
+        <table id="af-gauge"></table>
+        <div class="hint">
+          Typical single-wall spiral lock-seam duct gauges for low/medium pressure per
+          SMACNA-style schedules — the current diameter's row is highlighted. Shop practice is
+          often to make <strong>fittings two gauges heavier</strong> than the pipe they connect to.
+          Gauge requirements change with pressure class, reinforcement, and negative pressure:
+          always verify against the current <strong>SMACNA HVAC Duct Construction Standards</strong>
+          and your project spec. Recommended velocities as a rule of thumb: residential branches
+          600–900 FPM, residential mains 700–1200 FPM, commercial mains 1200–2000 FPM,
+          commercial branches 800–1200 FPM, industrial dust/fume conveying 3500–4500 FPM.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <footer>
     All results are centerline dimensions — allow for seams, connectors, and crimp as your shop practice requires.<br>
     Formulas: true offset = √(rise² + roll²) · travel = offset ÷ sin(angle) · run = offset ÷ tan(angle) ·
@@ -413,7 +484,7 @@
   function setUnit(u) {
     if (u === unit) return;
     var f = u === "mm" ? 25.4 : 1 / 25.4;
-    ["off-rise", "off-roll", "off-takeout", "off-dia", "mi-dia", "mi-throat", "to-dia", "to-radius", "to-tangent"].forEach(function (id) {
+    ["off-rise", "off-roll", "off-takeout", "off-dia", "mi-dia", "mi-throat", "to-dia", "to-radius", "to-tangent", "af-dia"].forEach(function (id) {
       var el = $(id), v = parseFloat(el.value);
       if (isFinite(v)) el.value = +(v * f).toFixed(u === "mm" ? 1 : 3);
     });
@@ -422,7 +493,7 @@
     $("unit-mm").classList.toggle("active", u === "mm");
     var lbl = u === "mm" ? "(mm)" : "(in)";
     document.querySelectorAll("label .u").forEach(function (s) { s.textContent = lbl; });
-    calcOffset(); calcMiter(); calcTakeout();
+    calcOffset(); calcMiter(); calcTakeout(); calcAirflow();
   }
   $("unit-in").addEventListener("click", function () { setUnit("in"); });
   $("unit-mm").addEventListener("click", function () { setUnit("mm"); });
@@ -1080,9 +1151,86 @@
     document.querySelector('[data-tab="offset"]').click();
   });
 
+  // ========== AIRFLOW & GAUGES ==========
+  var GAUGES = [
+    { lo: 3,  hi: 14, ga: "28 ga", th: "0.0187″ / 0.48 mm" },
+    { lo: 15, hi: 26, ga: "26 ga", th: "0.0217″ / 0.55 mm" },
+    { lo: 27, hi: 36, ga: "24 ga", th: "0.0276″ / 0.70 mm" },
+    { lo: 37, hi: 50, ga: "22 ga", th: "0.0336″ / 0.85 mm" },
+    { lo: 51, hi: 60, ga: "20 ga", th: "0.0396″ / 1.00 mm" },
+    { lo: 61, hi: 84, ga: "18 ga", th: "0.0516″ / 1.31 mm" }
+  ];
+  // approximate 90-degree loss coefficients for round elbows (ASHRAE/SMACNA-style data)
+  var C90 = { smooth: 0.21, gore5: 0.33, gore3: 0.54, miter: 1.2 };
+  // fraction of the 90-degree coefficient at partial angles
+  var ANGLE_F = [[0, 0], [20, 0.31], [30, 0.45], [45, 0.6], [60, 0.78], [75, 0.9], [90, 1]];
+  function angleFactor(a) {
+    for (var i = 1; i < ANGLE_F.length; i++) {
+      if (a <= ANGLE_F[i][0]) {
+        var lo = ANGLE_F[i - 1], hi = ANGLE_F[i];
+        return lo[1] + (hi[1] - lo[1]) * (a - lo[0]) / (hi[0] - lo[0]);
+      }
+    }
+    return 1;
+  }
+
+  function fmtNum(v, dec) { return isFinite(v) ? v.toFixed(dec) : "—"; }
+
+  function calcAirflow() {
+    var dia = num("af-dia"), cfm = num("af-cfm");
+    var type = $("af-type").value, a = parseFloat($("af-angle").value);
+    var err = $("af-err"), out = $("af-results"), tbl = $("af-gauge");
+    err.textContent = "";
+
+    var diaIn = unit === "mm" ? dia / 25.4 : dia;
+    if (!isFinite(diaIn) || diaIn <= 0) {
+      err.textContent = "Enter a pipe diameter greater than zero.";
+      out.innerHTML = ""; tbl.innerHTML = ""; return;
+    }
+    var area = Math.PI * Math.pow(diaIn / 12, 2) / 4; // sq ft
+    var C = C90[type] * angleFactor(a);
+
+    var html = "";
+    html += resultRow("Cross-section area", fmtNum(area, 3) + " sq ft");
+    if (isFinite(cfm) && cfm > 0) {
+      var V = cfm / area;                      // FPM
+      var VP = Math.pow(V / 4005, 2);          // in. w.g.
+      var fric = 0.109136 * Math.pow(cfm, 1.9) / Math.pow(diaIn, 5.02); // in. w.g. / 100 ft
+      html += resultRow("Velocity at " + cfm + " CFM",
+        Math.round(V) + " FPM (" + fmtNum(V * 0.00508, 1) + " m/s)", true);
+      html += resultRow("Velocity pressure (VP)", fmtNum(VP, 3) + "″ w.g.");
+      html += resultRow("Straight duct friction", fmtNum(fric, 3) + "″ w.g. per 100 ft");
+      html += resultRow("Fitting loss coefficient (C), " + a + "° " +
+        $("af-type").options[$("af-type").selectedIndex].text.split(" (")[0].toLowerCase(),
+        fmtNum(C, 2));
+      html += resultRow("Pressure loss through this fitting (C × VP)",
+        fmtNum(C * VP, 3) + "″ w.g.", true);
+    } else {
+      html += resultRow("Velocity", "enter CFM above");
+    }
+    html += resultRow("CFM at 1000 FPM (quiet)", Math.round(area * 1000) + " CFM");
+    html += resultRow("CFM at 1500 FPM (typical main)", Math.round(area * 1500) + " CFM");
+    html += resultRow("CFM at 2000 FPM (max commercial)", Math.round(area * 2000) + " CFM");
+    out.innerHTML = html;
+
+    var rows = "<thead><tr><th>Diameter</th><th>Gauge</th><th>Thickness</th></tr></thead><tbody>";
+    GAUGES.forEach(function (g) {
+      var hit = diaIn >= g.lo - 0.5 && diaIn <= g.hi + 0.5;
+      rows += '<tr' + (hit ? ' style="color:var(--accent);font-weight:700"' : '') + '><td>' +
+        g.lo + "–" + g.hi + "″ (" + Math.round(g.lo * 25.4) + "–" + Math.round(g.hi * 25.4) + " mm)" +
+        "</td><td>" + g.ga + "</td><td>" + g.th + "</td></tr>";
+    });
+    rows += "</tbody>";
+    tbl.innerHTML = rows;
+  }
+
+  ["af-dia", "af-cfm"].forEach(function (id) { $(id).addEventListener("input", calcAirflow); });
+  ["af-type", "af-angle"].forEach(function (id) { $(id).addEventListener("change", calcAirflow); });
+
   calcOffset();
   calcMiter();
   calcTakeout();
+  calcAirflow();
 })();
 </script>
 </body>

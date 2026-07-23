@@ -207,6 +207,13 @@
             </select>
           </div>
         </div>
+        <div class="row2">
+          <div>
+            <label for="mi-throat">Throat length <span class="u">(in)</span> — short side, from pipe end</label>
+            <input type="number" id="mi-throat" step="any" min="0" value="0">
+          </div>
+          <div></div>
+        </div>
         <label for="mi-mode">What are you cutting?</label>
         <select id="mi-mode">
           <option value="elbow" selected>Two-piece elbow / offset fitting (enter total fitting angle)</option>
@@ -236,6 +243,9 @@
           around the pipe, measure up from the reference line by the rise in the table, connect
           the points with a smooth curve, and cut. Mark 0 is the <strong>throat</strong> (short
           side); the middle mark is the <strong>heel</strong> (long side).
+          If you set a <strong>throat length</strong>, use the "up from pipe end" column instead —
+          every mark is measured straight up from the squared end of the pipe, so the throat lands
+          exactly where you want it.
         </div>
         <table id="mi-table"></table>
         <button class="btn" onclick="window.print()">🖨 Print cut sheet</button>
@@ -431,7 +441,9 @@
   // ========== MITER CUT ==========
   function calcMiter() {
     var dia = num("mi-dia"), n = parseInt($("mi-points").value, 10),
-        angIn = num("mi-angle"), mode = $("mi-mode").value;
+        angIn = num("mi-angle"), mode = $("mi-mode").value,
+        throat = num("mi-throat") || 0;
+    if (throat < 0) throat = 0;
     var err = $("mi-err"), out = $("mi-results"), tbl = $("mi-table");
     err.textContent = "";
 
@@ -462,10 +474,15 @@
     html += resultRow("Mark spacing around pipe (C ÷ " + n + ")", fmtLen(C / n));
     html += resultRow("Heel − throat difference (max rise)", fmtLen(maxRise), true);
     html += resultRow("Rise at quarter points (D ÷ 2 × tan)", fmtLen(R * t));
+    if (throat > 0) {
+      html += resultRow("Throat length (from pipe end)", fmtLen(throat));
+      html += resultRow("Heel length (throat + max rise)", fmtLen(throat + maxRise), true);
+    }
     out.innerHTML = html;
 
     // ordinate table: mark i at arc distance i*C/n from throat, rise = R*tan*(1-cosθ)
-    var rows = '<thead><tr><th>Mark</th><th>Around pipe from throat</th><th>Rise from reference line</th></tr></thead><tbody>';
+    var rows = '<thead><tr><th>Mark</th><th>Around pipe from throat</th><th>Rise from reference line</th>' +
+      (throat > 0 ? '<th>Up from pipe end</th>' : '') + '</tr></thead><tbody>';
     var pts = [];
     for (var i = 0; i <= n; i++) {
       var theta = (2 * Math.PI * i) / n;
@@ -473,12 +490,13 @@
       var rise = R * t * (1 - Math.cos(theta));
       pts.push({ arc: arc, rise: rise });
       var name = i === 0 || i === n ? i + " (throat)" : (i === n / 2 ? i + " (heel)" : String(i));
-      rows += "<tr><td>" + name + "</td><td>" + fmtLen(arc) + "</td><td>" + fmtLen(rise) + "</td></tr>";
+      rows += "<tr><td>" + name + "</td><td>" + fmtLen(arc) + "</td><td>" + fmtLen(rise) + "</td>" +
+        (throat > 0 ? "<td>" + fmtLen(throat + rise) + "</td>" : "") + "</tr>";
     }
     rows += "</tbody>";
     tbl.innerHTML = rows;
 
-    drawMiter({ pts: pts, C: C, maxRise: maxRise, n: n });
+    drawMiter({ pts: pts, C: C, maxRise: maxRise, n: n, throat: throat });
   }
 
   function drawMiter(d) {
@@ -487,37 +505,45 @@
     var padL = 60, padR = 30, padT = 40, padB = 46;
     var W = 900, H = 300;
     var plotW = W - padL - padR, plotH = H - padT - padB;
+    var hasThroat = d.throat > 0;
+    var total = d.maxRise + (hasThroat ? d.throat : 0);
     var sx = plotW / d.C;
-    var sy = d.maxRise > 0 ? plotH / d.maxRise : 0;
+    var sy = total > 0 ? plotH / total : 0;
 
     var s = "";
-    // reference line
-    var baseY = H - padB;
-    s += svgLine(padL, baseY, padL + plotW, baseY, "#93a3ba", 1.5);
-    s += svgText(padL, baseY + 24, "reference line (squared around pipe at throat)", "#93a3ba", 12, "start");
+    var baseY = H - padB;                                  // pipe end (or reference line)
+    var refY = baseY - (hasThroat ? d.throat * sy : 0);    // throat reference line
+    if (hasThroat) {
+      s += svgLine(padL, baseY, padL + plotW, baseY, "#6fe3a5", 2);
+      s += svgText(padL, baseY + 24, "end of pipe — throat " + fmtLen(d.throat).split(" (")[0] + " up to reference line", "#6fe3a5", 12, "start");
+      s += svgLine(padL, refY, padL + plotW, refY, "#93a3ba", 1.5, "6 4");
+    } else {
+      s += svgLine(padL, baseY, padL + plotW, baseY, "#93a3ba", 1.5);
+      s += svgText(padL, baseY + 24, "reference line (squared around pipe at throat)", "#93a3ba", 12, "start");
+    }
 
     // curve
     var path = "";
     d.pts.forEach(function (p, i) {
-      var x = padL + p.arc * sx, y = baseY - p.rise * sy;
+      var x = padL + p.arc * sx, y = refY - p.rise * sy;
       path += (i === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1) + " ";
     });
     s += '<path d="' + path + '" fill="none" stroke="#f5a623" stroke-width="3" stroke-linejoin="round"/>';
 
     // marks
     d.pts.forEach(function (p, i) {
-      var x = padL + p.arc * sx, y = baseY - p.rise * sy;
+      var x = padL + p.arc * sx, y = refY - p.rise * sy;
       s += svgLine(x, baseY, x, y, "#2e3c52", 1);
       s += '<circle cx="' + x + '" cy="' + y + '" r="3.5" fill="#4fc3f7"/>';
       if (d.n <= 16 || i % 2 === 0) s += svgText(x, baseY + 14, i, "#93a3ba", 11);
     });
 
     s += svgText(padL, padT - 14, "CUT LINE — pipe unrolled flat (throat at both ends, heel in the middle)", "#e8eef7", 14, "start");
-    s += svgText(padL + plotW / 2, baseY - d.maxRise * sy + 22, "heel", "#f5a623", 12);
+    s += svgText(padL + plotW / 2, refY - d.maxRise * sy + 22, "heel", "#f5a623", 12);
     svg.innerHTML = s;
   }
 
-  ["mi-dia", "mi-angle"].forEach(function (id) { $(id).addEventListener("input", calcMiter); });
+  ["mi-dia", "mi-angle", "mi-throat"].forEach(function (id) { $(id).addEventListener("input", calcMiter); });
   $("mi-points").addEventListener("change", calcMiter);
   $("mi-mode").addEventListener("change", function () {
     $("mi-angle-label").textContent = this.value === "elbow"

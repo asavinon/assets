@@ -26,6 +26,10 @@ Generates a wrap-around cut layout for cutting round pipe at any angle:
 - Produces an ordinate table: distance around the pipe from the throat and the
   rise above a squared reference line at each mark
   (`rise = R × tan(cut) × (1 − cos θ)`), plus a drawing of the unrolled cut line.
+- Optional **throat length** input: set the exact throat (short-side) length and
+  the table adds an "up from pipe end" column (`throat + rise`) so every mark is
+  measured from the squared end of the pipe; also reports the resulting heel
+  length (`throat + D × tan(cut)`).
 - Printable cut sheet.
 
 Units toggle between inches (with nearest-1/16″ fractions) and millimeters.

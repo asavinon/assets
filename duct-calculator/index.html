@@ -635,7 +635,8 @@
                  travel: travel, run: run, rollRot: rollRot });
     var dia3 = num("off-dia");
     if (!isFinite(dia3) || dia3 <= 0) dia3 = Math.max(trueOffset / 6, 1);
-    getViewer("off-3d").setQuads(offsetMesh(rise, roll, a, dia3));
+    var m3 = offsetMesh(rise, roll, a, dia3);
+    getViewer("off-3d").setQuads(m3.quads, m3.dims);
   }
 
   function svgLine(x1, y1, x2, y2, stroke, w, dash) {
@@ -762,7 +763,8 @@
     tbl.innerHTML = rows;
 
     drawMiter({ pts: pts, C: C, maxRise: maxRise, n: n, throat: throat });
-    getViewer("mi-3d").setQuads(miterMesh(dia, cut, throat));
+    var mm3 = miterMesh(dia, cut, throat);
+    getViewer("mi-3d").setQuads(mm3.quads, mm3.dims);
   }
 
   function drawMiter(d) {
@@ -875,17 +877,18 @@
     }, { passive: false });
   }
 
-  Viewer.prototype.setQuads = function (quads) {
+  Viewer.prototype.setQuads = function (quads, dims) {
     this.quads = quads;
+    this.dims = dims || [];
     var mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
-    quads.forEach(function (q) {
-      q.pts.forEach(function (p) {
-        for (var i = 0; i < 3; i++) {
-          if (p[i] < mn[i]) mn[i] = p[i];
-          if (p[i] > mx[i]) mx[i] = p[i];
-        }
-      });
-    });
+    function grow(p) {
+      for (var i = 0; i < 3; i++) {
+        if (p[i] < mn[i]) mn[i] = p[i];
+        if (p[i] > mx[i]) mx[i] = p[i];
+      }
+    }
+    quads.forEach(function (q) { q.pts.forEach(grow); });
+    this.dims.forEach(function (d) { grow(d.a); grow(d.b); });
     this.center = [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2];
     this.rad = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) / 2 || 1;
     this.render();
@@ -935,11 +938,43 @@
       ctx.fill();
       ctx.stroke();
     });
+
+    // dimension lines with ticks and label pills, projected with the model
+    (this.dims || []).forEach(function (dim) {
+      var A = tr(dim.a), B = tr(dim.b);
+      var dx = B[0] - A[0], dy = B[1] - A[1];
+      var len = Math.hypot(dx, dy);
+      if (len < 4) return;
+      var nx = -dy / len, ny = dx / len;
+      ctx.strokeStyle = dim.color || "#e8eef7";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+      ctx.moveTo(A[0] - nx * 5, A[1] - ny * 5); ctx.lineTo(A[0] + nx * 5, A[1] + ny * 5);
+      ctx.moveTo(B[0] - nx * 5, B[1] - ny * 5); ctx.lineTo(B[0] + nx * 5, B[1] + ny * 5);
+      ctx.stroke();
+      var mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2 + (dim.below ? 14 : -12);
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var tw = ctx.measureText(dim.label).width;
+      ctx.fillStyle = "rgba(16,21,28,0.88)";
+      ctx.fillRect(mx - tw / 2 - 5, my - 9, tw + 10, 18);
+      ctx.fillStyle = dim.color || "#e8eef7";
+      ctx.fillText(dim.label, mx, my);
+    });
   };
 
   var viewers = {};
+  var VIEW_INIT = { "to-3d": { rx: -0.2, ry: -0.25 }, "mi-3d": { rx: -0.3, ry: 0.55 } };
   function getViewer(id) {
-    if (!viewers[id]) viewers[id] = new Viewer(id);
+    if (!viewers[id]) {
+      viewers[id] = new Viewer(id);
+      if (VIEW_INIT[id]) {
+        viewers[id].rx = VIEW_INIT[id].rx;
+        viewers[id].ry = VIEW_INIT[id].ry;
+      }
+    }
     return viewers[id];
   }
   function renderAllViewers() {
@@ -1040,7 +1075,21 @@
     var P2 = vadd(P1, vmul(d2, travel));
     var P3 = vadd(P2, [stub, 0, 0]);
     var path = roundedPath3([P0, P1, P2, P3], clr, C_PIPE, C_FIT);
-    return tubeQuads(path, dia / 2, 26, C_END);
+
+    var short = function (v) { return fmtLen(v).split(" (")[0]; };
+    var run = travel * Math.cos(aR);
+    var w = vnorm(vcross(d2, u)); // normal of the offset plane
+    var g = dia * 1.15;
+    var dims = [
+      { a: vadd(P1, vmul(w, g)), b: vadd(P2, vmul(w, g)),
+        label: "travel " + short(travel), color: "#f5a623" },
+      { a: [0, -g, 0], b: [run, -g, 0], label: "run " + short(run), below: true }
+    ];
+    if (rise > 0.01) dims.push({ a: [run, 0, roll + g], b: [run, rise, roll + g],
+      label: "rise " + short(rise), color: "#4fc3f7" });
+    if (roll > 0.01) dims.push({ a: [run, -g, 0], b: [run, -g, roll],
+      label: "roll " + short(roll), color: "#4fc3f7", below: true });
+    return { quads: tubeQuads(path, dia / 2, 26, C_END), dims: dims };
   }
 
   // single elbow with real CLR and collars
@@ -1051,7 +1100,18 @@
     var leg = t + collar + 1e-9;
     var P0 = [-leg, 0, 0], Q = [0, 0, 0], P1 = vmul(d2, leg);
     var path = roundedPath3([P0, Q, P1], clr, C_FIT, C_FIT);
-    return tubeQuads(path, dia / 2, 30, C_END);
+
+    var short = function (v) { return fmtLen(v).split(" (")[0]; };
+    var g = dia * 0.95;
+    var C = [-t, clr, 0]; // bend center
+    var mid = vadd(C, vmul([Math.sin(aR / 2), -Math.cos(aR / 2), 0], clr));
+    var n2 = [Math.sin(aR), -Math.cos(aR), 0]; // in-plane perpendicular to leg 2
+    var dims = [
+      { a: [-leg, -g, 0], b: [0, -g, 0], label: "take-out " + short(leg), below: true },
+      { a: vadd(P1, vmul(n2, g)), b: vmul(n2, g), label: "take-out " + short(leg) },
+      { a: C, b: mid, label: "CLR " + short(clr), color: "#f5a623" }
+    ];
+    return { quads: tubeQuads(path, dia / 2, 30, C_END), dims: dims };
   }
 
   // straight pipe with a miter-cut top face
@@ -1077,7 +1137,18 @@
       quads.push({ pts: [top[j], top[j2], cTop, cTop], col: C_CUT });   // cut face
       quads.push({ pts: [bot[j], bot[j2], cBot, cBot], col: C_END });   // square end
     }
-    return quads;
+    var short = function (v) { return fmtLen(v).split(" (")[0]; };
+    var riseMax = dia * t;
+    var dims = [
+      { a: [-R, -R * 0.45, 0], b: [R, -R * 0.45, 0], label: "Ø " + short(dia), below: true }
+    ];
+    if (throatLen > 0) {
+      dims.push({ a: [R * 1.35, 0, 0], b: [R * 1.35, L, 0], label: "throat " + short(L), color: "#4fc3f7" });
+      dims.push({ a: [-R * 1.35, 0, 0], b: [-R * 1.35, L + riseMax, 0], label: "heel " + short(L + riseMax), color: "#f5a623" });
+    } else {
+      dims.push({ a: [-R * 1.35, L, 0], b: [-R * 1.35, L + riseMax, 0], label: "rise " + short(riseMax), color: "#f5a623" });
+    }
+    return { quads: quads, dims: dims };
   }
 
   // ========== FITTING TAKE-OUT ==========
@@ -1132,7 +1203,8 @@
     out.innerHTML = html;
 
     drawTakeout({ a: aRad, dia: dia, clr: clr, collar: collar, takeout: takeout });
-    getViewer("to-3d").setQuads(elbowMesh(a, dia, clr, collar));
+    var tm3 = elbowMesh(a, dia, clr, collar);
+    getViewer("to-3d").setQuads(tm3.quads, tm3.dims);
   }
 
   function drawTakeout(d) {

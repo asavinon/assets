@@ -44,6 +44,13 @@ radius** (CLR = throat radius + D ÷ 2), plus an optional straight collar length
   travel piece cut length uses real fitting dimensions
 - Dimensioned elbow diagram
 
+### 3D views
+Every tab includes an interactive CAD-style 3D model rendered with a built-in
+software renderer (no libraries, works offline): the full rolling-offset
+assembly showing how the fittings roll, the miter-cut pipe piece with the cut
+face highlighted, and the elbow built from the entered radius and collars.
+Drag to rotate, pinch or scroll to zoom.
+
 Units toggle between inches (with nearest-1/16″ fractions) and millimeters.
 All results are centerline dimensions — allow for seams and connectors per shop
 practice.

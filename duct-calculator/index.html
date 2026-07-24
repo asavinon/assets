@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sheet Metal Duct Calculator — Spiral Pipe Offsets &amp; Miter Cuts</title>
+<style>
+  :root {
+    --bg: #10151c;
+    --panel: #1a2230;
+    --panel2: #202b3d;
+    --line: #2e3c52;
+    --text: #e8eef7;
+    --muted: #93a3ba;
+    --accent: #f5a623;
+    --accent2: #4fc3f7;
+    --good: #6fe3a5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 18px; }
+  header h1 { font-size: 1.5rem; letter-spacing: .5px; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); font-size: .9rem; margin-top: 4px; }
+
+  .topbar {
+    display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+    margin-bottom: 16px; align-items: center;
+  }
+  .tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .tab-btn {
+    background: var(--panel); color: var(--muted); border: 1px solid var(--line);
+    padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: .95rem;
+    font-weight: 600;
+  }
+  .tab-btn.active { background: var(--accent); color: #1a1206; border-color: var(--accent); }
+  .unit-toggle {
+    display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  }
+  .unit-toggle button {
+    background: var(--panel); color: var(--muted); border: 0; padding: 10px 14px;
+    cursor: pointer; font-weight: 600;
+  }
+  .unit-toggle button.active { background: var(--accent2); color: #06222e; }
+
+  .tab { display: none; }
+  .tab.active { display: block; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px;
+  }
+  .card h2 { font-size: 1.05rem; margin-bottom: 12px; color: var(--accent2); }
+  .card h2.warn { color: var(--accent); }
+
+  label { display: block; font-size: .82rem; color: var(--muted); margin: 12px 0 4px; }
+  label:first-of-type { margin-top: 0; }
+  input, select {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--panel2); color: var(--text); font-size: 1rem;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent2); border-color: transparent; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .results .item {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 9px 0; border-bottom: 1px dashed var(--line); gap: 12px;
+  }
+  .results .item:last-child { border-bottom: 0; }
+  .results .k { color: var(--muted); font-size: .88rem; }
+  .results .v { font-weight: 700; font-size: 1.08rem; color: var(--good); text-align: right; }
+  .results .v.hl { color: var(--accent); font-size: 1.25rem; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .92rem; }
+  th, td { padding: 7px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .4px; }
+  td:first-child, th:first-child { text-align: left; }
+  tbody tr:nth-child(odd) { background: rgba(255,255,255,.02); }
+
+  .hint { font-size: .8rem; color: var(--muted); margin-top: 10px; line-height: 1.45; }
+  .svgbox { width: 100%; margin-top: 8px; background: var(--panel2); border-radius: 8px; border: 1px solid var(--line); }
+  .c3d {
+    width: 100%; height: 340px; display: block; margin-top: 8px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    touch-action: none; cursor: grab;
+  }
+  .c3d:active { cursor: grabbing; }
+  .full { grid-column: 1 / -1; }
+  .btn {
+    margin-top: 14px; width: 100%; padding: 11px; border: 0; border-radius: 8px;
+    background: var(--accent2); color: #06222e; font-weight: 700; font-size: .95rem; cursor: pointer;
+  }
+  .err { color: #ff8a80; font-size: .85rem; margin-top: 8px; min-height: 1em; }
+  footer { text-align: center; color: var(--muted); font-size: .78rem; margin-top: 26px; line-height: 1.5; }
+  @media print {
+    body { background: #fff; color: #000; }
+    .topbar, footer, .btn { display: none; }
+    .card { border-color: #999; background: #fff; }
+    .results .v, .results .k, td, th, .card h2, label { color: #000 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔧 Sheet Metal <span>Duct Calculator</span></h1>
+    <p>Rolling offsets &amp; miter cut layout for spiral pipe — any diameter, any degree</p>
+  </header>
+
+  <div class="topbar">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="offset">Rolling Offset</button>
+      <button class="tab-btn" data-tab="miter">Miter Cut Layout</button>
+      <button class="tab-btn" data-tab="takeout">Fitting Take-Out</button>
+      <button class="tab-btn" data-tab="airflow">Airflow &amp; Gauges</button>
+      <button class="tab-btn" data-tab="smacna">SMACNA</button>
+    </div>
+    <div class="unit-toggle">
+      <button id="unit-in" class="active">inches</button>
+      <button id="unit-mm">mm</button>
+    </div>
+  </div>
+
+  <!-- ============ ROLLING OFFSET ============ -->
+  <div class="tab active" id="tab-offset">
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+        <div class="row2">
+          <div>
+            <label for="off-rise">Rise / vertical offset <span class="u">(in)</span></label>
+            <input type="number" id="off-rise" step="any" min="0" value="20">
+          </div>
+          <div>
+            <label for="off-roll">Roll / horizontal offset <span class="u">(in)</span></label>
+            <input type="number" id="off-roll" step="any" min="0" value="15">
+          </div>
+        </div>
+        <label for="off-angle">Fitting angle</label>
+        <select id="off-angle">
+          <option value="90">90°</option>
+          <option value="60">60°</option>
+          <option value="45" selected>45°</option>
+          <option value="30">30°</option>
+          <option value="22.5">22½°</option>
+          <option value="15">15°</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div id="off-custom-wrap" style="display:none">
+          <label for="off-custom">Custom angle (degrees)</label>
+          <input type="number" id="off-custom" step="any" min="0.1" max="90" value="45">
+        </div>
+        <div class="row2">
+          <div>
+            <label for="off-takeout">Fitting take-out, each end <span class="u">(in)</span> — optional</label>
+            <input type="number" id="off-takeout" step="any" min="0" value="0">
+          </div>
+          <div>
+            <label for="off-dia">Pipe diameter <span class="u">(in)</span> — synced across tabs</label>
+            <input type="number" id="off-dia" step="any" min="0" value="8">
+          </div>
+        </div>
+        <div class="err" id="off-err"></div>
+        <div class="hint">
+          For a flat (single-plane) offset, enter the roll as 0.
+          <strong>Take-out</strong> is how much each fitting eats into the travel piece — the
+          cut length of the middle pipe = travel − 2 × take-out.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+        <div class="results" id="off-results"></div>
+      </div>
+
+      <div class="card full">
+        <h2>Diagram</h2>
+        <svg id="off-svg" class="svgbox" viewBox="0 0 900 340" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hint">
+          End view (left) shows the roll rotation: install both fittings rotated that many degrees
+          off plumb toward the roll side, aimed at each other. Side view (right) shows the true
+          offset triangle: run along the main line, true offset across, travel on the diagonal.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>3D view — assembly as it hangs in the field</h2>
+        <canvas id="off-3d" class="c3d"></canvas>
+        <div class="hint">
+          <strong>Drag to rotate · pinch or scroll to zoom.</strong> Grey is straight pipe,
+          orange is the fittings, green faces are open ends. Rotate it to sight down the main
+          line — that's the view you'll have in the field, and the tilt of the diagonal shows
+          you exactly how the fittings roll.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MITER CUT ============ -->
+  <div class="tab" id="tab-miter">
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+        <div class="row2">
+          <div>
+            <label for="mi-dia">Pipe diameter <span class="u">(in)</span></label>
+            <input type="number" id="mi-dia" step="any" min="0.1" value="8">
+          </div>
+          <div>
+            <label for="mi-points"># of layout marks</label>
+            <select id="mi-points">
+              <option value="8">8</option>
+              <option value="12">12</option>
+              <option value="16" selected>16</option>
+              <option value="24">24</option>
+              <option value="32">32</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="mi-throat">Throat length <span class="u">(in)</span> — short side, from pipe end</label>
+            <input type="number" id="mi-throat" step="any" min="0" value="0">
+          </div>
+          <div></div>
+        </div>
+        <label for="mi-mode">What are you cutting?</label>
+        <select id="mi-mode">
+          <option value="elbow" selected>Two-piece elbow / offset fitting (enter total fitting angle)</option>
+          <option value="direct">Direct miter (enter cut angle off square)</option>
+        </select>
+        <label for="mi-angle" id="mi-angle-label">Total fitting angle (degrees)</label>
+        <input type="number" id="mi-angle" step="any" min="0.1" max="90" value="45">
+        <div class="err" id="mi-err"></div>
+        <div class="hint">
+          A two-piece elbow or one offset fitting of angle A is made by cutting the pipe at
+          <strong>A ÷ 2</strong> off square, then rotating one piece 180° and rejoining.
+          A rolling offset needs <strong>two</strong> fittings at the fitting angle — cut both the same.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+        <div class="results" id="mi-results"></div>
+      </div>
+
+      <div class="card full">
+        <h2>Wrap-around layout</h2>
+        <svg id="mi-svg" class="svgbox" viewBox="0 0 900 300" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hint">
+          Wrap a strip of paper (or measure along the circumference with a flexible tape) around
+          the pipe. Square a reference line around the pipe at the throat. At each mark distance
+          around the pipe, measure up from the reference line by the rise in the table, connect
+          the points with a smooth curve, and cut. Mark 0 is the <strong>throat</strong> (short
+          side); the middle mark is the <strong>heel</strong> (long side).
+          If you set a <strong>throat length</strong>, use the "up from pipe end" column instead —
+          every mark is measured straight up from the squared end of the pipe, so the throat lands
+          exactly where you want it.
+        </div>
+        <table id="mi-table"></table>
+        <button class="btn" onclick="window.print()">🖨 Print cut sheet</button>
+      </div>
+
+      <div class="card full">
+        <h2>3D view — the cut piece</h2>
+        <canvas id="mi-3d" class="c3d"></canvas>
+        <div class="hint">
+          <strong>Drag to rotate · pinch or scroll to zoom.</strong> The orange face is the
+          miter cut — throat on the low side, heel on the high side. Two of these joined with
+          one piece spun 180° make the fitting.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FITTING TAKE-OUT ============ -->
+  <div class="tab" id="tab-takeout">
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+        <label for="to-angle">Fitting angle</label>
+        <select id="to-angle">
+          <option value="90">90°</option>
+          <option value="60">60°</option>
+          <option value="45" selected>45°</option>
+          <option value="30">30°</option>
+          <option value="22.5">22½°</option>
+          <option value="15">15°</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div id="to-custom-wrap" style="display:none">
+          <label for="to-custom">Custom angle (degrees)</label>
+          <input type="number" id="to-custom" step="any" min="0.1" max="90" value="45">
+        </div>
+        <div class="row2">
+          <div>
+            <label for="to-dia">Pipe diameter <span class="u">(in)</span></label>
+            <input type="number" id="to-dia" step="any" min="0.1" value="8">
+          </div>
+          <div>
+            <label for="to-rtype">Which radius do you know?</label>
+            <select id="to-rtype">
+              <option value="throat" selected>Throat radius</option>
+              <option value="clr">Centerline radius (CLR)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="to-radius" id="to-radius-label">Throat radius <span class="u">(in)</span></label>
+            <input type="number" id="to-radius" step="any" min="0" value="4">
+          </div>
+          <div>
+            <label for="to-tangent">Straight collar, each end <span class="u">(in)</span> — optional</label>
+            <input type="number" id="to-tangent" step="any" min="0" value="0">
+          </div>
+        </div>
+        <div class="err" id="to-err"></div>
+        <div class="hint">
+          The <strong>throat radius</strong> is the inside curve of the fitting; the
+          <strong>centerline radius</strong> runs down the middle of the pipe
+          (CLR = throat radius + D ÷ 2). If the fitting has a straight collar or
+          slip section past the curve, add its length — it extends the take-out.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+        <div class="results" id="to-results"></div>
+        <button class="btn" id="to-apply">Use this take-out in the Rolling Offset tab →</button>
+      </div>
+
+      <div class="card full">
+        <h2>Diagram</h2>
+        <svg id="to-svg" class="svgbox" viewBox="0 0 900 320" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="hint">
+          <strong>Take-out</strong> is measured from the end of the fitting to the point where the
+          two centerlines would intersect. Travel and run are figured centerline-to-centerline, so
+          subtracting the take-out at each end gives the true cut length of the straight pipe
+          between fittings: cut length = travel − 2 × take-out.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>3D view — the fitting</h2>
+        <canvas id="to-3d" class="c3d"></canvas>
+        <div class="hint">
+          <strong>Drag to rotate · pinch or scroll to zoom.</strong> The elbow built from your
+          angle, diameter, and radius — green faces are the connection ends the take-out is
+          measured from.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ AIRFLOW & GAUGES ============ -->
+  <div class="tab" id="tab-airflow">
+    <div class="grid">
+      <div class="card">
+        <h2>Inputs</h2>
+        <div class="row2">
+          <div>
+            <label for="af-dia">Pipe diameter <span class="u">(in)</span></label>
+            <input type="number" id="af-dia" step="any" min="1" value="8">
+          </div>
+          <div>
+            <label for="af-cfm">Airflow (CFM)</label>
+            <input type="number" id="af-cfm" step="any" min="0" value="500">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="af-vel">Velocity (FPM)</label>
+            <input type="number" id="af-vel" step="any" min="0">
+          </div>
+          <div></div>
+        </div>
+        <div class="row2">
+          <div>
+            <label for="af-type">Fitting type (for pressure loss)</label>
+            <select id="af-type">
+              <option value="smooth" selected>Pressed / smooth elbow (R/D ≈ 1.5)</option>
+              <option value="gore5">Gored elbow — 5 piece</option>
+              <option value="gore3">Gored elbow — 3 piece</option>
+              <option value="miter">Mitered elbow (single cut)</option>
+            </select>
+          </div>
+          <div>
+            <label for="af-angle">Fitting angle</label>
+            <select id="af-angle">
+              <option value="90" selected>90°</option>
+              <option value="60">60°</option>
+              <option value="45">45°</option>
+              <option value="30">30°</option>
+              <option value="22.5">22½°</option>
+              <option value="15">15°</option>
+            </select>
+          </div>
+        </div>
+        <div class="err" id="af-err"></div>
+        <div class="hint">
+          <strong>How this works:</strong> the duct's cross-section area (sq ft) comes from the
+          diameter; velocity = CFM ÷ area. Velocity pressure VP = (V ÷ 4005)² in inches w.g.
+          Straight-duct friction uses the standard galvanized duct equation
+          0.109136 × CFM<sup>1.9</sup> ÷ D<sup>5.02</sup> per 100 ft. A fitting's loss is its
+          coefficient C × VP — smoother, longer-radius fittings have lower C. A rolling offset
+          has <strong>two</strong> fittings, so double the fitting loss.
+          <strong>CFM and velocity work both ways</strong> — enter either one and the other is
+          calculated. Whichever you typed last is held when you change pipe size: hold a CFM and
+          watch velocity move, or hold a design velocity (say 1500 FPM) and step through pipe
+          sizes to see the CFM each size carries. Diameter is synced with the other tabs.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Results</h2>
+        <div class="results" id="af-results"></div>
+      </div>
+
+      <div class="card full">
+        <h2 class="warn">Typical spiral pipe gauge schedule (galvanized)</h2>
+        <table id="af-gauge"></table>
+        <div class="hint">
+          Typical single-wall spiral lock-seam duct gauges for low/medium pressure per
+          SMACNA-style schedules — the current diameter's row is highlighted. Shop practice is
+          often to make <strong>fittings two gauges heavier</strong> than the pipe they connect to.
+          Gauge requirements change with pressure class, reinforcement, and negative pressure:
+          always verify against the current <strong>SMACNA HVAC Duct Construction Standards</strong>
+          and your project spec. Recommended velocities as a rule of thumb: residential branches
+          600–900 FPM, residential mains 700–1200 FPM, commercial mains 1200–2000 FPM,
+          commercial branches 800–1200 FPM, industrial dust/fume conveying 3500–4500 FPM.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SMACNA REFERENCE ============ -->
+  <div class="tab" id="tab-smacna">
+    <div class="grid">
+      <div class="card full">
+        <h2>What SMACNA is</h2>
+        <div class="hint" style="font-size:.9rem">
+          <strong>SMACNA</strong> — the Sheet Metal and Air Conditioning Contractors' National
+          Association — publishes the construction standards this trade builds to. The book that
+          governs nearly everything in this app is <strong>HVAC Duct Construction Standards —
+          Metal &amp; Flexible</strong> (ANSI/SMACNA 006), which covers gauges, joints, seams,
+          reinforcement, hangers, and sealing for rectangular, round, and oval duct. Related
+          manuals: <em>HVAC Air Duct Leakage Test Manual</em> and <em>HVAC Systems Duct Design</em>.
+          Standards, technical papers, and the store are at <strong>smacna.org</strong>. The tables
+          below are field-reference summaries of the commonly used values — the manual and your
+          project spec always govern.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Pressure class &amp; seal class</h2>
+        <table>
+          <thead><tr><th>Duct pressure class</th><th>Seal class</th><th>What gets sealed</th></tr></thead>
+          <tbody>
+            <tr><td>½″ and 1″ w.g.</td><td>C*</td><td>Transverse joints</td></tr>
+            <tr><td>2″ w.g.</td><td>C</td><td>Transverse joints</td></tr>
+            <tr><td>3″ w.g.</td><td>B</td><td>Transverse joints + longitudinal seams</td></tr>
+            <tr><td>4″, 6″, 10″ w.g.</td><td>A</td><td>Joints, seams, and all wall penetrations</td></tr>
+          </tbody>
+        </table>
+        <div class="hint">
+          *Historically unsealed unless specified — but modern energy codes (IECC/IMC, Title 24)
+          typically require sealing <strong>all</strong> duct regardless of pressure class, so in
+          practice: seal everything. Spiral lock seams don't require sealant; slip-fit fitting
+          joints get sealant plus fasteners.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Leakage class by seal class</h2>
+        <table>
+          <thead><tr><th>Seal class</th><th>Round &amp; flat oval duct</th><th>Rectangular duct</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>CL 3</td><td>CL 6</td></tr>
+            <tr><td>B</td><td>CL 6</td><td>CL 12</td></tr>
+            <tr><td>C</td><td>CL 12</td><td>CL 24</td></tr>
+          </tbody>
+        </table>
+        <div class="hint">
+          Leakage class CL = leakage in CFM per 100 sq ft of duct surface at 1″ w.g., per the
+          SMACNA <em>HVAC Air Duct Leakage Test Manual</em>. Lower is tighter — this is why
+          sealed spiral round (CL 3) is the tightest system you can hang, roughly 8× tighter
+          than minimally sealed rectangular.
+        </div>
+      </div>
+
+      <div class="card full">
+        <h2>Round duct field rules of thumb</h2>
+        <div class="results">
+          <div class="item"><span class="k">Gauge schedule</span>
+            <span class="v" style="font-size:.92rem">See the Airflow &amp; Gauges tab — typical for ±2″ w.g. single-wall spiral</span></div>
+          <div class="item"><span class="k">Negative pressure / higher class</span>
+            <span class="v" style="font-size:.92rem">Usually one to two gauges heavier — check the manual's negative-pressure tables</span></div>
+          <div class="item"><span class="k">Fittings</span>
+            <span class="v" style="font-size:.92rem">Commonly two gauges heavier than the connecting pipe</span></div>
+          <div class="item"><span class="k">Hangers &amp; supports</span>
+            <span class="v" style="font-size:.92rem">Typically max 12 ft spacing, straps/rods sized to diameter — SMACNA Ch. 5</span></div>
+          <div class="item"><span class="k">Fitting joints</span>
+            <span class="v" style="font-size:.92rem">Sealant on the male end, fasten per spec, pull sealant through the joint — don't just paint the outside</span></div>
+          <div class="item"><span class="k">Elbow construction</span>
+            <span class="v" style="font-size:.92rem">Die-stamped ≤ ~8″ · pleated/pressed mid sizes · gored (segmented) larger — gore count drives pressure loss</span></div>
+        </div>
+        <div class="hint">
+          These are the values crews use day to day. Anything structural — reinforcement,
+          internal supports, seismic, high-pressure class — comes straight out of the current
+          edition tables, not from memory or an app.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    All results are centerline dimensions — allow for seams, connectors, and crimp as your shop practice requires.<br>
+    Formulas: true offset = √(rise² + roll²) · travel = offset ÷ sin(angle) · run = offset ÷ tan(angle) ·
+    roll rotation = atan(roll ÷ rise) · miter rise at θ = R·tan(cut)·(1 − cos θ) ·
+    take-out = CLR·tan(angle ÷ 2) + collar
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var unit = "in"; // "in" | "mm"
+
+  var $ = function (id) { return document.getElementById(id); };
+  var D2R = Math.PI / 180;
+
+  // ---------- formatting ----------
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+
+  function fmtLen(v) {
+    if (!isFinite(v)) return "—";
+    if (unit === "mm") return v.toFixed(1) + " mm";
+    // inches: decimal + nearest 1/16 fraction
+    var whole = Math.floor(v);
+    var frac = Math.round((v - whole) * 16);
+    if (frac === 16) { whole += 1; frac = 0; }
+    var fs = "";
+    if (frac > 0) {
+      var g = gcd(frac, 16);
+      fs = " " + (frac / g) + "/" + (16 / g);
+    }
+    var nice = (whole || !fs ? whole : "") + fs;
+    return v.toFixed(2) + "″ (" + (String(nice).trim() || "0") + "″)";
+  }
+
+  function fmtDeg(v) {
+    if (!isFinite(v)) return "—";
+    return (Math.round(v * 10) / 10) + "°";
+  }
+
+  function num(id) { return parseFloat($(id).value); }
+
+  function resultRow(k, v, hl) {
+    return '<div class="item"><span class="k">' + k + '</span><span class="v' +
+      (hl ? ' hl' : '') + '">' + v + '</span></div>';
+  }
+
+  // ---------- unit toggle ----------
+  function setUnit(u) {
+    if (u === unit) return;
+    var f = u === "mm" ? 25.4 : 1 / 25.4;
+    ["off-rise", "off-roll", "off-takeout", "off-dia", "mi-dia", "mi-throat", "to-dia", "to-radius", "to-tangent", "af-dia"].forEach(function (id) {
+      var el = $(id), v = parseFloat(el.value);
+      if (isFinite(v)) el.value = +(v * f).toFixed(u === "mm" ? 1 : 3);
+    });
+    unit = u;
+    $("unit-in").classList.toggle("active", u === "in");
+    $("unit-mm").classList.toggle("active", u === "mm");
+    var lbl = u === "mm" ? "(mm)" : "(in)";
+    document.querySelectorAll("label .u").forEach(function (s) { s.textContent = lbl; });
+    calcOffset(); calcMiter(); calcTakeout(); calcAirflow();
+  }
+  $("unit-in").addEventListener("click", function () { setUnit("in"); });
+  $("unit-mm").addEventListener("click", function () { setUnit("mm"); });
+
+  // ---------- tabs ----------
+  document.querySelectorAll(".tab-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".tab-btn").forEach(function (x) { x.classList.remove("active"); });
+      document.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
+      b.classList.add("active");
+      $("tab-" + b.dataset.tab).classList.add("active");
+      renderAllViewers(); // canvases in a hidden tab have zero size until shown
+    });
+  });
+
+  // ========== ROLLING OFFSET ==========
+  function offsetAngle() {
+    var sel = $("off-angle").value;
+    return sel === "custom" ? num("off-custom") : parseFloat(sel);
+  }
+
+  function calcOffset() {
+    var rise = num("off-rise"), roll = num("off-roll"),
+        a = offsetAngle(), takeout = num("off-takeout") || 0;
+    var err = $("off-err"), out = $("off-results");
+    err.textContent = "";
+
+    if (!isFinite(rise) || !isFinite(roll) || rise < 0 || roll < 0 || (rise === 0 && roll === 0)) {
+      err.textContent = "Enter a rise and/or roll greater than zero.";
+      out.innerHTML = ""; drawOffset(null); return;
+    }
+    if (!isFinite(a) || a <= 0 || a > 90) {
+      err.textContent = "Fitting angle must be between 0° and 90°.";
+      out.innerHTML = ""; drawOffset(null); return;
+    }
+
+    var trueOffset = Math.hypot(rise, roll);
+    var travel = trueOffset / Math.sin(a * D2R);
+    var run = a === 90 ? 0 : trueOffset / Math.tan(a * D2R);
+    var rollRot = Math.atan2(roll, rise) / D2R;
+    var cutLen = travel - 2 * takeout;
+    var cutAngle = a / 2;
+
+    var html = "";
+    html += resultRow("True offset (diagonal of rise &amp; roll)", fmtLen(trueOffset));
+    html += resultRow("Travel — center to center of fittings", fmtLen(travel), true);
+    if (takeout > 0) {
+      html += resultRow("Cut length of travel piece (travel − 2 × take-out)",
+        cutLen > 0 ? fmtLen(cutLen) : "take-out too large", cutLen > 0);
+    }
+    html += resultRow("Run — length used along the main line", fmtLen(run));
+    html += resultRow("Roll rotation — turn fittings off plumb by", fmtDeg(rollRot), true);
+    html += resultRow("Fitting angle (both fittings)", fmtDeg(a));
+    html += resultRow("Miter cut per fitting, if shop-made (angle ÷ 2)", fmtDeg(cutAngle));
+    out.innerHTML = html;
+
+    drawOffset({ rise: rise, roll: roll, a: a, trueOffset: trueOffset,
+                 travel: travel, run: run, rollRot: rollRot });
+    var dia3 = num("off-dia");
+    if (!isFinite(dia3) || dia3 <= 0) dia3 = Math.max(trueOffset / 6, 1);
+    var m3 = offsetMesh(rise, roll, a, dia3);
+    getViewer("off-3d").setQuads(m3.quads, m3.dims);
+  }
+
+  function svgLine(x1, y1, x2, y2, stroke, w, dash) {
+    return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 +
+      '" stroke="' + stroke + '" stroke-width="' + (w || 2) + '"' +
+      (dash ? ' stroke-dasharray="' + dash + '"' : '') + ' stroke-linecap="round"/>';
+  }
+  function svgText(x, y, t, fill, size, anchor) {
+    return '<text x="' + x + '" y="' + y + '" fill="' + (fill || "#93a3ba") +
+      '" font-size="' + (size || 13) + '" text-anchor="' + (anchor || "middle") +
+      '" font-family="system-ui,sans-serif">' + t + '</text>';
+  }
+
+  function drawOffset(d) {
+    var svg = $("off-svg");
+    if (!d) { svg.innerHTML = ""; return; }
+    var s = "";
+
+    // ---- left: end view (rise/roll square) ----
+    var pad = 55, box = 210, ox = 60, oy = 60;
+    var maxRR = Math.max(d.rise, d.roll) || 1;
+    var w = (d.roll / maxRR) * box, h = (d.rise / maxRR) * box;
+    var x0 = ox, y0 = oy + box, x1 = ox + w, y1 = oy + box - h;
+    s += svgLine(x0, y0, x1, y0, "#4fc3f7", 2, "5 4");       // roll
+    s += svgLine(x1, y0, x1, y1, "#4fc3f7", 2, "5 4");       // rise
+    s += svgLine(x0, y0, x1, y1, "#f5a623", 3.5);            // true offset diagonal
+    s += '<circle cx="' + x0 + '" cy="' + y0 + '" r="5" fill="#6fe3a5"/>';
+    s += '<circle cx="' + x1 + '" cy="' + y1 + '" r="5" fill="#6fe3a5"/>';
+    s += svgText((x0 + x1) / 2, y0 + 20, "roll " + fmtLen(d.roll).split(" (")[0]);
+    s += svgText(x1 + 10, (y0 + y1) / 2, "rise " + fmtLen(d.rise).split(" (")[0], "#93a3ba", 13, "start");
+    s += svgText((x0 + x1) / 2 - 15, (y0 + y1) / 2 - 8, "true offset", "#f5a623", 13, "end");
+    s += svgText(ox + box / 2, oy - 22, "END VIEW — roll rotation " + fmtDeg(d.rollRot), "#e8eef7", 14);
+
+    // ---- right: side view (offset triangle) ----
+    var ox2 = 430, oy2 = 70, boxW = 400, boxH = 200;
+    var run = d.run, off = d.trueOffset;
+    var scale = Math.min(boxW / Math.max(run + off * 0.4, 1e-6), boxH / off);
+    var rw = run * scale, oh = off * scale;
+    var seg = 70; // straight pipe stubs
+    var ax = ox2, ay = oy2 + boxH;               // start point
+    var bx = ax + seg, by = ay;                  // first fitting
+    var cx2 = bx + rw, cy2 = ay - oh;            // second fitting
+    var dx = cx2 + seg, dy = cy2;                // end point
+    s += svgLine(ax, ay, bx, by, "#6fe3a5", 6);
+    s += svgLine(bx, by, cx2, cy2, "#f5a623", 6);
+    s += svgLine(cx2, cy2, dx, dy, "#6fe3a5", 6);
+    s += '<circle cx="' + bx + '" cy="' + by + '" r="7" fill="#4fc3f7"/>';
+    s += '<circle cx="' + cx2 + '" cy="' + cy2 + '" r="7" fill="#4fc3f7"/>';
+    s += svgLine(bx, by, cx2, by, "#93a3ba", 1.5, "5 4");      // run
+    s += svgLine(cx2, by, cx2, cy2, "#93a3ba", 1.5, "5 4");    // offset
+    s += svgText((bx + cx2) / 2, by + 20, "run " + fmtLen(d.run).split(" (")[0]);
+    s += svgText(cx2 + 10, (by + cy2) / 2, "true offset", "#93a3ba", 13, "start");
+    s += svgText((bx + cx2) / 2, (by + cy2) / 2 - 12, "travel " + fmtLen(d.travel).split(" (")[0], "#f5a623", 14);
+    s += svgText(bx + 46, by - 8, fmtDeg(d.a), "#4fc3f7", 13);
+    s += svgText(ox2 + boxW / 2, oy2 - 28, "SIDE VIEW — true offset plane", "#e8eef7", 14);
+
+    svg.innerHTML = s;
+  }
+
+  ["off-rise", "off-roll", "off-takeout", "off-dia", "off-custom"].forEach(function (id) {
+    $(id).addEventListener("input", calcOffset);
+  });
+  $("off-angle").addEventListener("change", function () {
+    $("off-custom-wrap").style.display = this.value === "custom" ? "" : "none";
+    calcOffset();
+  });
+
+  // ========== MITER CUT ==========
+  function calcMiter() {
+    var dia = num("mi-dia"), n = parseInt($("mi-points").value, 10),
+        angIn = num("mi-angle"), mode = $("mi-mode").value,
+        throat = num("mi-throat") || 0;
+    if (throat < 0) throat = 0;
+    var err = $("mi-err"), out = $("mi-results"), tbl = $("mi-table");
+    err.textContent = "";
+
+    if (!isFinite(dia) || dia <= 0) {
+      err.textContent = "Enter a pipe diameter greater than zero.";
+      out.innerHTML = ""; tbl.innerHTML = ""; drawMiter(null); return;
+    }
+    if (!isFinite(angIn) || angIn <= 0 || angIn > 90) {
+      err.textContent = "Angle must be between 0° and 90°.";
+      out.innerHTML = ""; tbl.innerHTML = ""; drawMiter(null); return;
+    }
+
+    var cut = mode === "elbow" ? angIn / 2 : angIn;   // cut angle off square
+    if (cut >= 90) {
+      err.textContent = "Cut angle must be less than 90° off square.";
+      out.innerHTML = ""; tbl.innerHTML = ""; drawMiter(null); return;
+    }
+
+    var R = dia / 2;
+    var C = Math.PI * dia;
+    var t = Math.tan(cut * D2R);
+    var maxRise = dia * t; // heel minus throat
+
+    var html = "";
+    if (mode === "elbow") html += resultRow("Fitting / elbow angle", fmtDeg(angIn));
+    html += resultRow("Cut angle off square", fmtDeg(cut), true);
+    html += resultRow("Circumference (mark spacing × " + n + ")", fmtLen(C));
+    html += resultRow("Mark spacing around pipe (C ÷ " + n + ")", fmtLen(C / n));
+    html += resultRow("Heel − throat difference (max rise)", fmtLen(maxRise), true);
+    html += resultRow("Rise at quarter points (D ÷ 2 × tan)", fmtLen(R * t));
+    if (throat > 0) {
+      html += resultRow("Throat length (from pipe end)", fmtLen(throat));
+      html += resultRow("Heel length (throat + max rise)", fmtLen(throat + maxRise), true);
+    }
+    out.innerHTML = html;
+
+    // ordinate table: mark i at arc distance i*C/n from throat, rise = R*tan*(1-cosθ)
+    var rows = '<thead><tr><th>Mark</th><th>Around pipe from throat</th><th>Rise from reference line</th>' +
+      (throat > 0 ? '<th>Up from pipe end</th>' : '') + '</tr></thead><tbody>';
+    var pts = [];
+    for (var i = 0; i <= n; i++) {
+      var theta = (2 * Math.PI * i) / n;
+      var arc = (C * i) / n;
+      var rise = R * t * (1 - Math.cos(theta));
+      pts.push({ arc: arc, rise: rise });
+      var name = i === 0 || i === n ? i + " (throat)" : (i === n / 2 ? i + " (heel)" : String(i));
+      rows += "<tr><td>" + name + "</td><td>" + fmtLen(arc) + "</td><td>" + fmtLen(rise) + "</td>" +
+        (throat > 0 ? "<td>" + fmtLen(throat + rise) + "</td>" : "") + "</tr>";
+    }
+    rows += "</tbody>";
+    tbl.innerHTML = rows;
+
+    drawMiter({ pts: pts, C: C, maxRise: maxRise, n: n, throat: throat });
+    var mm3 = miterMesh(dia, cut, throat);
+    getViewer("mi-3d").setQuads(mm3.quads, mm3.dims);
+  }
+
+  function drawMiter(d) {
+    var svg = $("mi-svg");
+    if (!d) { svg.innerHTML = ""; return; }
+    var padL = 60, padR = 30, padT = 40, padB = 46;
+    var W = 900, H = 300;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+    var hasThroat = d.throat > 0;
+    var total = d.maxRise + (hasThroat ? d.throat : 0);
+    var sx = plotW / d.C;
+    var sy = total > 0 ? plotH / total : 0;
+
+    var s = "";
+    var baseY = H - padB;                                  // pipe end (or reference line)
+    var refY = baseY - (hasThroat ? d.throat * sy : 0);    // throat reference line
+    if (hasThroat) {
+      s += svgLine(padL, baseY, padL + plotW, baseY, "#6fe3a5", 2);
+      s += svgText(padL, baseY + 24, "end of pipe — throat " + fmtLen(d.throat).split(" (")[0] + " up to reference line", "#6fe3a5", 12, "start");
+      s += svgLine(padL, refY, padL + plotW, refY, "#93a3ba", 1.5, "6 4");
+    } else {
+      s += svgLine(padL, baseY, padL + plotW, baseY, "#93a3ba", 1.5);
+      s += svgText(padL, baseY + 24, "reference line (squared around pipe at throat)", "#93a3ba", 12, "start");
+    }
+
+    // curve
+    var path = "";
+    d.pts.forEach(function (p, i) {
+      var x = padL + p.arc * sx, y = refY - p.rise * sy;
+      path += (i === 0 ? "M" : "L") + x.toFixed(1) + " " + y.toFixed(1) + " ";
+    });
+    s += '<path d="' + path + '" fill="none" stroke="#f5a623" stroke-width="3" stroke-linejoin="round"/>';
+
+    // marks
+    d.pts.forEach(function (p, i) {
+      var x = padL + p.arc * sx, y = refY - p.rise * sy;
+      s += svgLine(x, baseY, x, y, "#2e3c52", 1);
+      s += '<circle cx="' + x + '" cy="' + y + '" r="3.5" fill="#4fc3f7"/>';
+      if (d.n <= 16 || i % 2 === 0) s += svgText(x, baseY + 14, i, "#93a3ba", 11);
+    });
+
+    s += svgText(padL, padT - 14, "CUT LINE — pipe unrolled flat (throat at both ends, heel in the middle)", "#e8eef7", 14, "start");
+    s += svgText(padL + plotW / 2, refY - d.maxRise * sy + 22, "heel", "#f5a623", 12);
+    svg.innerHTML = s;
+  }
+
+  ["mi-dia", "mi-angle", "mi-throat"].forEach(function (id) { $(id).addEventListener("input", calcMiter); });
+  $("mi-points").addEventListener("change", calcMiter);
+  $("mi-mode").addEventListener("change", function () {
+    $("mi-angle-label").textContent = this.value === "elbow"
+      ? "Total fitting angle (degrees)" : "Cut angle off square (degrees)";
+    calcMiter();
+  });
+
+  // ========== tiny 3D engine (no libraries — CAD-style orbit view) ==========
+  function vsub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function vadd(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+  function vmul(a, s) { return [a[0] * s, a[1] * s, a[2] * s]; }
+  function vdot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function vcross(a, b) {
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  }
+  function vlen(a) { return Math.hypot(a[0], a[1], a[2]); }
+  function vnorm(a) { var l = vlen(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  function vrot(v, axis, ang) { // Rodrigues rotation about unit axis
+    var c = Math.cos(ang), s = Math.sin(ang);
+    return vadd(vadd(vmul(v, c), vmul(vcross(axis, v), s)), vmul(axis, vdot(axis, v) * (1 - c)));
+  }
+
+  var C_PIPE = [148, 170, 198], C_FIT = [245, 166, 35], C_END = [111, 227, 165], C_CUT = [245, 166, 35];
+
+  function Viewer(id) {
+    this.cv = $(id);
+    this.ctx = this.cv.getContext("2d");
+    this.rx = -0.45; this.ry = 0.7; this.zoom = 1;
+    this.quads = []; this.center = [0, 0, 0]; this.rad = 1;
+    var self = this, ptrs = {}, lastD = 0;
+    this.cv.addEventListener("pointerdown", function (e) {
+      ptrs[e.pointerId] = [e.clientX, e.clientY];
+      self.cv.setPointerCapture(e.pointerId);
+    });
+    this.cv.addEventListener("pointermove", function (e) {
+      if (!ptrs[e.pointerId]) return;
+      var ks = Object.keys(ptrs);
+      if (ks.length === 1) {
+        var p = ptrs[e.pointerId];
+        self.ry += (e.clientX - p[0]) * 0.01;
+        self.rx += (e.clientY - p[1]) * 0.01;
+        self.rx = Math.max(-1.55, Math.min(1.55, self.rx));
+        ptrs[e.pointerId] = [e.clientX, e.clientY];
+        self.render();
+      } else if (ks.length === 2) {
+        ptrs[e.pointerId] = [e.clientX, e.clientY];
+        var a = ptrs[ks[0]], b = ptrs[ks[1]];
+        var d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        if (lastD) {
+          self.zoom = Math.max(0.3, Math.min(4, self.zoom * d / lastD));
+          self.render();
+        }
+        lastD = d;
+      }
+    });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) {
+      self.cv.addEventListener(ev, function (e) { delete ptrs[e.pointerId]; lastD = 0; });
+    });
+    this.cv.addEventListener("wheel", function (e) {
+      e.preventDefault();
+      self.zoom = Math.max(0.3, Math.min(4, self.zoom * (e.deltaY < 0 ? 1.1 : 0.9)));
+      self.render();
+    }, { passive: false });
+  }
+
+  Viewer.prototype.setQuads = function (quads, dims) {
+    this.quads = quads;
+    this.dims = dims || [];
+    var mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+    function grow(p) {
+      for (var i = 0; i < 3; i++) {
+        if (p[i] < mn[i]) mn[i] = p[i];
+        if (p[i] > mx[i]) mx[i] = p[i];
+      }
+    }
+    quads.forEach(function (q) { q.pts.forEach(grow); });
+    this.dims.forEach(function (d) { grow(d.a); grow(d.b); });
+    this.center = [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2];
+    this.rad = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) / 2 || 1;
+    this.render();
+  };
+
+  Viewer.prototype.render = function () {
+    var cv = this.cv, ctx = this.ctx;
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h || !this.quads.length) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    var cx = w / 2, cy = h / 2, sc = Math.min(w, h) * 0.42 * this.zoom / this.rad;
+    var sX = Math.sin(this.rx), cX = Math.cos(this.rx),
+        sY = Math.sin(this.ry), cY = Math.cos(this.ry);
+    var c0 = this.center;
+    function tr(p) {
+      var x = p[0] - c0[0], y = p[1] - c0[1], z = p[2] - c0[2];
+      var x1 = x * cY + z * sY, z1 = -x * sY + z * cY;
+      var y1 = y * cX - z1 * sX, z2 = y * sX + z1 * cX;
+      return [cx + x1 * sc, cy - y1 * sc, z2];
+    }
+    var light = vnorm([0.45, 0.85, 0.55]);
+    var faces = [];
+    this.quads.forEach(function (q) {
+      var t = [tr(q.pts[0]), tr(q.pts[1]), tr(q.pts[2]), tr(q.pts[3])];
+      faces.push({ t: t, z: (t[0][2] + t[1][2] + t[2][2] + t[3][2]) / 4, col: q.col });
+    });
+    faces.sort(function (a, b) { return b.z - a.z; }); // paint far to near
+    faces.forEach(function (f) {
+      var t = f.t;
+      var n = vnorm(vcross(vsub(t[1], t[0]), vsub(t[3], t[0])));
+      var sh = 0.32 + 0.62 * Math.abs(vdot(n, light));
+      var fill = "rgb(" + (f.col[0] * sh | 0) + "," + (f.col[1] * sh | 0) + "," + (f.col[2] * sh | 0) + ")";
+      ctx.beginPath();
+      ctx.moveTo(t[0][0], t[0][1]);
+      ctx.lineTo(t[1][0], t[1][1]);
+      ctx.lineTo(t[2][0], t[2][1]);
+      ctx.lineTo(t[3][0], t[3][1]);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.strokeStyle = fill; // covers antialiasing seams between quads
+      ctx.lineWidth = 1;
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    // dimension lines with ticks and label pills, projected with the model
+    (this.dims || []).forEach(function (dim) {
+      var A = tr(dim.a), B = tr(dim.b);
+      var dx = B[0] - A[0], dy = B[1] - A[1];
+      var len = Math.hypot(dx, dy);
+      if (len < 4) return;
+      var nx = -dy / len, ny = dx / len;
+      ctx.strokeStyle = dim.color || "#e8eef7";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+      ctx.moveTo(A[0] - nx * 5, A[1] - ny * 5); ctx.lineTo(A[0] + nx * 5, A[1] + ny * 5);
+      ctx.moveTo(B[0] - nx * 5, B[1] - ny * 5); ctx.lineTo(B[0] + nx * 5, B[1] + ny * 5);
+      ctx.stroke();
+      var mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2 + (dim.below ? 14 : -12);
+      ctx.font = "600 12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var tw = ctx.measureText(dim.label).width;
+      ctx.fillStyle = "rgba(16,21,28,0.88)";
+      ctx.fillRect(mx - tw / 2 - 5, my - 9, tw + 10, 18);
+      ctx.fillStyle = dim.color || "#e8eef7";
+      ctx.fillText(dim.label, mx, my);
+    });
+  };
+
+  var viewers = {};
+  var VIEW_INIT = { "to-3d": { rx: -0.2, ry: -0.25 }, "mi-3d": { rx: -0.3, ry: 0.55 } };
+  function getViewer(id) {
+    if (!viewers[id]) {
+      viewers[id] = new Viewer(id);
+      if (VIEW_INIT[id]) {
+        viewers[id].rx = VIEW_INIT[id].rx;
+        viewers[id].ry = VIEW_INIT[id].ry;
+      }
+    }
+    return viewers[id];
+  }
+  function renderAllViewers() {
+    Object.keys(viewers).forEach(function (k) { viewers[k].render(); });
+  }
+  window.addEventListener("resize", renderAllViewers);
+
+  // centerline path through corner points, corners rounded with radius r
+  function roundedPath3(pts, r, colStraight, colArc) {
+    var samples = [];
+    function push(p, col) {
+      var last = samples[samples.length - 1];
+      if (last && vlen(vsub(last.p, p)) < 1e-6) { last.col = col; return; }
+      samples.push({ p: p, col: col });
+    }
+    var cur = pts[0];
+    push(cur, colStraight);
+    for (var i = 1; i < pts.length - 1; i++) {
+      var Q = pts[i];
+      var u = vnorm(vsub(Q, cur)), v = vnorm(vsub(pts[i + 1], Q));
+      var A = Math.acos(Math.max(-1, Math.min(1, vdot(u, v))));
+      if (A < 1e-4) { continue; }
+      var t = r * Math.tan(A / 2);
+      var prevAvail = vlen(vsub(Q, cur)) * (i === 1 ? 0.995 : 0.5);
+      var nextAvail = vlen(vsub(pts[i + 1], Q)) * (i === pts.length - 2 ? 0.995 : 0.5);
+      t = Math.min(t, prevAvail, nextAvail);
+      var rEff = t / Math.tan(A / 2);
+      var S = vsub(Q, vmul(u, t)), E = vadd(Q, vmul(v, t));
+      var m = vnorm(vadd(vmul(u, -1), v));
+      var c = vadd(Q, vmul(m, rEff / Math.cos(A / 2)));
+      var axis = vnorm(vcross(vsub(S, c), vsub(E, c)));
+      var steps = Math.max(6, Math.ceil(A / (6 * D2R)));
+      push(S, colArc);
+      for (var k = 1; k <= steps; k++) {
+        push(vadd(c, vrot(vsub(S, c), axis, (A * k) / steps)), k < steps ? colArc : colStraight);
+      }
+      cur = E;
+    }
+    push(pts[pts.length - 1], colStraight);
+    return samples;
+  }
+
+  // sweep a circular tube along sampled centerline (parallel-transport frames)
+  function tubeQuads(samples, radius, segs, capCol) {
+    var n = samples.length, i, j;
+    var T = [], N = [], B = [];
+    for (i = 0; i < n; i++) {
+      T.push(vnorm(vsub(samples[Math.min(i + 1, n - 1)].p, samples[Math.max(i - 1, 0)].p)));
+    }
+    var n0 = vcross(T[0], [0, 1, 0]);
+    if (vlen(n0) < 1e-6) n0 = vcross(T[0], [1, 0, 0]);
+    N.push(vnorm(n0));
+    B.push(vnorm(vcross(T[0], N[0])));
+    for (i = 1; i < n; i++) {
+      var nn = vsub(N[i - 1], vmul(T[i], vdot(N[i - 1], T[i])));
+      if (vlen(nn) < 1e-6) nn = vcross(B[i - 1], T[i]);
+      N.push(vnorm(nn));
+      B.push(vnorm(vcross(T[i], N[i])));
+    }
+    var rings = [];
+    for (i = 0; i < n; i++) {
+      var ring = [];
+      for (j = 0; j < segs; j++) {
+        var th = (2 * Math.PI * j) / segs;
+        ring.push(vadd(samples[i].p,
+          vadd(vmul(N[i], radius * Math.cos(th)), vmul(B[i], radius * Math.sin(th)))));
+      }
+      rings.push(ring);
+    }
+    var quads = [];
+    for (i = 0; i < n - 1; i++) {
+      for (j = 0; j < segs; j++) {
+        var j2 = (j + 1) % segs;
+        quads.push({ pts: [rings[i][j], rings[i][j2], rings[i + 1][j2], rings[i + 1][j]], col: samples[i].col });
+      }
+    }
+    if (capCol) {
+      [0, n - 1].forEach(function (i) {
+        for (var j = 0; j < segs; j++) {
+          var j2 = (j + 1) % segs;
+          quads.push({ pts: [rings[i][j], rings[i][j2], samples[i].p, samples[i].p], col: capCol });
+        }
+      });
+    }
+    return quads;
+  }
+
+  // full rolling-offset assembly: stub -> fitting -> travel -> fitting -> stub
+  function offsetMesh(rise, roll, a, dia) {
+    var aR = a * D2R;
+    var u = vnorm([0, rise, roll]);
+    var d2 = vadd(vmul([1, 0, 0], Math.cos(aR)), vmul(u, Math.sin(aR)));
+    var O = Math.hypot(rise, roll);
+    var travel = O / Math.sin(aR);
+    var stub = Math.max(travel * 0.35, dia * 1.6);
+    var clr = dia * 1.5; // visual bend radius only
+    var P0 = [-stub, 0, 0], P1 = [0, 0, 0];
+    var P2 = vadd(P1, vmul(d2, travel));
+    var P3 = vadd(P2, [stub, 0, 0]);
+    var path = roundedPath3([P0, P1, P2, P3], clr, C_PIPE, C_FIT);
+
+    var short = function (v) { return fmtLen(v).split(" (")[0]; };
+    var run = travel * Math.cos(aR);
+    var w = vnorm(vcross(d2, u)); // normal of the offset plane
+    var g = dia * 1.15;
+    var dims = [
+      { a: vadd(P1, vmul(w, g)), b: vadd(P2, vmul(w, g)),
+        label: "travel " + short(travel), color: "#f5a623" },
+      { a: [0, -g, 0], b: [run, -g, 0], label: "run " + short(run), below: true }
+    ];
+    if (rise > 0.01) dims.push({ a: [run, 0, roll + g], b: [run, rise, roll + g],
+      label: "rise " + short(rise), color: "#4fc3f7" });
+    if (roll > 0.01) dims.push({ a: [run, -g, 0], b: [run, -g, roll],
+      label: "roll " + short(roll), color: "#4fc3f7", below: true });
+    return { quads: tubeQuads(path, dia / 2, 26, C_END), dims: dims };
+  }
+
+  // single elbow with real CLR and collars
+  function elbowMesh(a, dia, clr, collar) {
+    var aR = a * D2R;
+    var d2 = [Math.cos(aR), Math.sin(aR), 0];
+    var t = clr * Math.tan(aR / 2);
+    var leg = t + collar + 1e-9;
+    var P0 = [-leg, 0, 0], Q = [0, 0, 0], P1 = vmul(d2, leg);
+    var path = roundedPath3([P0, Q, P1], clr, C_FIT, C_FIT);
+
+    var short = function (v) { return fmtLen(v).split(" (")[0]; };
+    var g = dia * 0.95;
+    var C = [-t, clr, 0]; // bend center
+    var mid = vadd(C, vmul([Math.sin(aR / 2), -Math.cos(aR / 2), 0], clr));
+    var n2 = [Math.sin(aR), -Math.cos(aR), 0]; // in-plane perpendicular to leg 2
+    var dims = [
+      { a: [-leg, -g, 0], b: [0, -g, 0], label: "take-out " + short(leg), below: true },
+      { a: vadd(P1, vmul(n2, g)), b: vmul(n2, g), label: "take-out " + short(leg) },
+      { a: C, b: mid, label: "CLR " + short(clr), color: "#f5a623" }
+    ];
+    return { quads: tubeQuads(path, dia / 2, 30, C_END), dims: dims };
+  }
+
+  // straight pipe with a miter-cut top face
+  function miterMesh(dia, cut, throatLen) {
+    var R = dia / 2, t = Math.tan(cut * D2R);
+    var L = throatLen > 0 ? throatLen : dia * 0.9;
+    var segs = 40, j, j2;
+    var bot = [], top = [], cSum = [0, 0, 0];
+    for (j = 0; j < segs; j++) {
+      var th = (2 * Math.PI * j) / segs;
+      var x = R * Math.cos(th), z = R * Math.sin(th);
+      // throat at th=0 (+x side); cut rises toward the heel
+      var y = L + R * t * (1 - Math.cos(th));
+      bot.push([x, 0, z]);
+      top.push([x, y, z]);
+      cSum = vadd(cSum, [x, y, z]);
+    }
+    var cTop = vmul(cSum, 1 / segs), cBot = [0, 0, 0];
+    var quads = [];
+    for (j = 0; j < segs; j++) {
+      j2 = (j + 1) % segs;
+      quads.push({ pts: [bot[j], bot[j2], top[j2], top[j]], col: C_PIPE });
+      quads.push({ pts: [top[j], top[j2], cTop, cTop], col: C_CUT });   // cut face
+      quads.push({ pts: [bot[j], bot[j2], cBot, cBot], col: C_END });   // square end
+    }
+    var short = function (v) { return fmtLen(v).split(" (")[0]; };
+    var riseMax = dia * t;
+    var dims = [
+      { a: [-R, -R * 0.45, 0], b: [R, -R * 0.45, 0], label: "Ø " + short(dia), below: true }
+    ];
+    if (throatLen > 0) {
+      dims.push({ a: [R * 1.35, 0, 0], b: [R * 1.35, L, 0], label: "throat " + short(L), color: "#4fc3f7" });
+      dims.push({ a: [-R * 1.35, 0, 0], b: [-R * 1.35, L + riseMax, 0], label: "heel " + short(L + riseMax), color: "#f5a623" });
+    } else {
+      dims.push({ a: [-R * 1.35, L, 0], b: [-R * 1.35, L + riseMax, 0], label: "rise " + short(riseMax), color: "#f5a623" });
+    }
+    return { quads: quads, dims: dims };
+  }
+
+  // ========== FITTING TAKE-OUT ==========
+  function takeoutAngle() {
+    var sel = $("to-angle").value;
+    return sel === "custom" ? num("to-custom") : parseFloat(sel);
+  }
+
+  var lastTakeout = null;
+
+  function calcTakeout() {
+    var a = takeoutAngle(), dia = num("to-dia"), r = num("to-radius"),
+        collar = num("to-tangent") || 0, type = $("to-rtype").value;
+    var err = $("to-err"), out = $("to-results");
+    err.textContent = "";
+    lastTakeout = null;
+
+    if (!isFinite(dia) || dia <= 0) {
+      err.textContent = "Enter a pipe diameter greater than zero.";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+    if (!isFinite(a) || a <= 0 || a > 90) {
+      err.textContent = "Fitting angle must be between 0° and 90°.";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+    if (!isFinite(r) || r < 0 || (type === "clr" && r <= 0)) {
+      err.textContent = "Enter the radius (throat radius may be 0 for a tight miter elbow).";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+    if (collar < 0) collar = 0;
+
+    var clr = type === "clr" ? r : r + dia / 2;
+    var throatR = clr - dia / 2;
+    if (throatR < 0) {
+      err.textContent = "Centerline radius is smaller than the pipe radius — check the numbers.";
+      out.innerHTML = ""; drawTakeout(null); return;
+    }
+
+    var aRad = a * D2R;
+    var takeout = clr * Math.tan(aRad / 2) + collar;
+    lastTakeout = takeout;
+
+    var html = "";
+    html += resultRow("Take-out (end of fitting to centerline intersection)", fmtLen(takeout), true);
+    html += resultRow("Centerline radius (CLR)", fmtLen(clr));
+    html += resultRow("Throat radius", fmtLen(throatR));
+    html += resultRow("Heel radius (CLR + D ÷ 2)", fmtLen(clr + dia / 2));
+    html += resultRow("Centerline arc length through the fitting", fmtLen(clr * aRad));
+    html += resultRow("Throat arc length", fmtLen(throatR * aRad));
+    html += resultRow("Heel arc length", fmtLen((clr + dia / 2) * aRad));
+    if (collar > 0) html += resultRow("Included straight collar, each end", fmtLen(collar));
+    out.innerHTML = html;
+
+    drawTakeout({ a: aRad, dia: dia, clr: clr, collar: collar, takeout: takeout });
+    var tm3 = elbowMesh(a, dia, clr, collar);
+    getViewer("to-3d").setQuads(tm3.quads, tm3.dims);
+  }
+
+  function drawTakeout(d) {
+    var svg = $("to-svg");
+    if (!d) { svg.innerHTML = ""; return; }
+    var W = 900, H = 320, pad = 52;
+
+    // geometry in fitting units: O (centerline intersection) at origin, leg 1 along -x,
+    // leg 2 leaving at angle a upward; arc center C above tangent point P1
+    var T = d.clr * Math.tan(d.a / 2);
+    var cx = -T, cy = d.clr; // arc center
+    var rIn = d.clr - d.dia / 2, rOut = d.clr + d.dia / 2;
+
+    function arcPt(rad, th) { return [cx + rad * Math.sin(th), cy - rad * Math.cos(th)]; }
+    var dir2 = [Math.cos(d.a), Math.sin(d.a)];
+
+    // sample everything to find the bounding box
+    var pts = [[0, 0], [-(T + d.collar), -d.dia / 2], [-(T + d.collar), d.dia / 2]];
+    var steps = 24;
+    for (var i = 0; i <= steps; i++) {
+      var th = (d.a * i) / steps;
+      pts.push(arcPt(rIn, th), arcPt(rOut, th));
+    }
+    var e2c = arcPt(d.clr, d.a);
+    pts.push([e2c[0] + dir2[0] * d.collar + dir2[1] * d.dia / 2, e2c[1] + dir2[1] * d.collar - dir2[0] * d.dia / 2]);
+    pts.push([e2c[0] + dir2[0] * d.collar - dir2[1] * d.dia / 2, e2c[1] + dir2[1] * d.collar + dir2[0] * d.dia / 2]);
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    pts.forEach(function (p) {
+      minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
+      minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
+    });
+    var sc = Math.min((W - 2 * pad) / Math.max(maxX - minX, 1e-6),
+                      (H - 2 * pad - 26) / Math.max(maxY - minY, 1e-6));
+    function X(p) { return pad + (p[0] - minX) * sc; }
+    function Y(p) { return H - pad - (p[1] - minY) * sc; } // flip y
+
+    function pathArc(rad) {
+      var s = "";
+      for (var i = 0; i <= steps; i++) {
+        var p = arcPt(rad, (d.a * i) / steps);
+        s += (i === 0 ? "M" : "L") + X(p).toFixed(1) + " " + Y(p).toFixed(1) + " ";
+      }
+      return s;
+    }
+
+    var s = "";
+    // pipe walls (throat + heel arcs) and end faces
+    s += '<path d="' + pathArc(rIn) + '" fill="none" stroke="#4fc3f7" stroke-width="2.5"/>';
+    s += '<path d="' + pathArc(rOut) + '" fill="none" stroke="#4fc3f7" stroke-width="2.5"/>';
+    var f1a = [-T - d.collar, -d.dia / 2], f1b = [-T - d.collar, d.dia / 2];
+    s += svgLine(X(f1a), Y(f1a), X(f1b), Y(f1b), "#6fe3a5", 3);
+    if (d.collar > 0) {
+      s += svgLine(X([-T, -d.dia / 2]), Y([-T, -d.dia / 2]), X(f1a), Y(f1a), "#4fc3f7", 2.5);
+      s += svgLine(X([-T, d.dia / 2]), Y([-T, d.dia / 2]), X(f1b), Y(f1b), "#4fc3f7", 2.5);
+    }
+    var p2i = arcPt(rIn, d.a), p2o = arcPt(rOut, d.a);
+    var f2i = [p2i[0] + dir2[0] * d.collar, p2i[1] + dir2[1] * d.collar];
+    var f2o = [p2o[0] + dir2[0] * d.collar, p2o[1] + dir2[1] * d.collar];
+    s += svgLine(X(f2i), Y(f2i), X(f2o), Y(f2o), "#6fe3a5", 3);
+    if (d.collar > 0) {
+      s += svgLine(X(p2i), Y(p2i), X(f2i), Y(f2i), "#4fc3f7", 2.5);
+      s += svgLine(X(p2o), Y(p2o), X(f2o), Y(f2o), "#4fc3f7", 2.5);
+    }
+    // centerline arc + dashed extensions to the intersection point O
+    s += '<path d="' + pathArc(d.clr) + '" fill="none" stroke="#f5a623" stroke-width="2" stroke-dasharray="7 5"/>';
+    s += svgLine(X([-T - d.collar, 0]), Y([-T - d.collar, 0]), X([0, 0]), Y([0, 0]), "#f5a623", 1.5, "7 5");
+    var e2 = arcPt(d.clr, d.a);
+    var e2f = [e2[0] + dir2[0] * d.collar, e2[1] + dir2[1] * d.collar];
+    s += svgLine(X(e2f), Y(e2f), X([0, 0]), Y([0, 0]), "#f5a623", 1.5, "7 5");
+    s += '<circle cx="' + X([0, 0]) + '" cy="' + Y([0, 0]) + '" r="5" fill="#f5a623"/>';
+    s += svgText(X([0, 0]) + 10, Y([0, 0]) + 4, "centerline intersection", "#f5a623", 12, "start");
+    // take-out dimension along leg 1
+    var dimY = Y([0, -d.dia / 2]) + 26;
+    s += svgLine(X(f1a), dimY, X([0, 0]), dimY, "#e8eef7", 1.5);
+    s += svgLine(X(f1a), dimY - 5, X(f1a), dimY + 5, "#e8eef7", 1.5);
+    s += svgLine(X([0, 0]), dimY - 5, X([0, 0]), dimY + 5, "#e8eef7", 1.5);
+    s += svgText((X(f1a) + X([0, 0])) / 2, dimY - 8, "take-out " + fmtLen(d.takeout).split(" (")[0], "#e8eef7", 13);
+    svg.innerHTML = s;
+  }
+
+  ["to-dia", "to-radius", "to-tangent", "to-custom"].forEach(function (id) {
+    $(id).addEventListener("input", calcTakeout);
+  });
+  $("to-angle").addEventListener("change", function () {
+    $("to-custom-wrap").style.display = this.value === "custom" ? "" : "none";
+    calcTakeout();
+  });
+  $("to-rtype").addEventListener("change", function () {
+    $("to-radius-label").innerHTML = (this.value === "clr" ? "Centerline radius (CLR) " : "Throat radius ") +
+      '<span class="u">(' + (unit === "mm" ? "mm" : "in") + ')</span>';
+    calcTakeout();
+  });
+  $("to-apply").addEventListener("click", function () {
+    if (lastTakeout === null) return;
+    $("off-takeout").value = +lastTakeout.toFixed(unit === "mm" ? 1 : 3);
+    calcOffset();
+    document.querySelector('[data-tab="offset"]').click();
+  });
+
+  // ========== AIRFLOW & GAUGES ==========
+  var GAUGES = [
+    { lo: 3,  hi: 14, ga: "28 ga", th: "0.0187″ / 0.48 mm" },
+    { lo: 15, hi: 26, ga: "26 ga", th: "0.0217″ / 0.55 mm" },
+    { lo: 27, hi: 36, ga: "24 ga", th: "0.0276″ / 0.70 mm" },
+    { lo: 37, hi: 50, ga: "22 ga", th: "0.0336″ / 0.85 mm" },
+    { lo: 51, hi: 60, ga: "20 ga", th: "0.0396″ / 1.00 mm" },
+    { lo: 61, hi: 84, ga: "18 ga", th: "0.0516″ / 1.31 mm" }
+  ];
+  // approximate 90-degree loss coefficients for round elbows (ASHRAE/SMACNA-style data)
+  var C90 = { smooth: 0.21, gore5: 0.33, gore3: 0.54, miter: 1.2 };
+  // fraction of the 90-degree coefficient at partial angles
+  var ANGLE_F = [[0, 0], [20, 0.31], [30, 0.45], [45, 0.6], [60, 0.78], [75, 0.9], [90, 1]];
+  function angleFactor(a) {
+    for (var i = 1; i < ANGLE_F.length; i++) {
+      if (a <= ANGLE_F[i][0]) {
+        var lo = ANGLE_F[i - 1], hi = ANGLE_F[i];
+        return lo[1] + (hi[1] - lo[1]) * (a - lo[0]) / (hi[0] - lo[0]);
+      }
+    }
+    return 1;
+  }
+
+  function fmtNum(v, dec) { return isFinite(v) ? v.toFixed(dec) : "—"; }
+
+  var afLast = "cfm"; // which of CFM / velocity the user entered last — that one is held
+
+  function calcAirflow() {
+    var dia = num("af-dia"), cfm = num("af-cfm"), vel = num("af-vel");
+    var type = $("af-type").value, a = parseFloat($("af-angle").value);
+    var err = $("af-err"), out = $("af-results"), tbl = $("af-gauge");
+    err.textContent = "";
+
+    var diaIn = unit === "mm" ? dia / 25.4 : dia;
+    if (!isFinite(diaIn) || diaIn <= 0) {
+      err.textContent = "Enter a pipe diameter greater than zero.";
+      out.innerHTML = ""; tbl.innerHTML = ""; return;
+    }
+    var area = Math.PI * Math.pow(diaIn / 12, 2) / 4; // sq ft
+    var C = C90[type] * angleFactor(a);
+
+    // two-way: hold whichever value was entered last, revalue the other
+    if (afLast === "vel" && isFinite(vel) && vel > 0) {
+      cfm = vel * area;
+      $("af-cfm").value = Math.round(cfm);
+    } else if (isFinite(cfm) && cfm > 0) {
+      $("af-vel").value = Math.round(cfm / area);
+    }
+
+    var html = "";
+    html += resultRow("Cross-section area", fmtNum(area, 3) + " sq ft");
+    if (isFinite(cfm) && cfm > 0) {
+      var V = cfm / area;                      // FPM
+      var VP = Math.pow(V / 4005, 2);          // in. w.g.
+      var fric = 0.109136 * Math.pow(cfm, 1.9) / Math.pow(diaIn, 5.02); // in. w.g. / 100 ft
+      html += resultRow("Airflow", Math.round(cfm) + " CFM", afLast === "vel");
+      html += resultRow("Velocity",
+        Math.round(V) + " FPM (" + fmtNum(V * 0.00508, 1) + " m/s)", afLast !== "vel");
+      html += resultRow("Velocity pressure (VP)", fmtNum(VP, 3) + "″ w.g.");
+      html += resultRow("Straight duct friction", fmtNum(fric, 3) + "″ w.g. per 100 ft");
+      html += resultRow("Fitting loss coefficient (C), " + a + "° " +
+        $("af-type").options[$("af-type").selectedIndex].text.split(" (")[0].toLowerCase(),
+        fmtNum(C, 2));
+      html += resultRow("Pressure loss through this fitting (C × VP)",
+        fmtNum(C * VP, 3) + "″ w.g.", true);
+    } else {
+      html += resultRow("Velocity", "enter CFM or FPM above");
+    }
+    html += resultRow("CFM at 1000 FPM (quiet)", Math.round(area * 1000) + " CFM");
+    html += resultRow("CFM at 1500 FPM (typical main)", Math.round(area * 1500) + " CFM");
+    html += resultRow("CFM at 2000 FPM (max commercial)", Math.round(area * 2000) + " CFM");
+    out.innerHTML = html;
+
+    var rows = "<thead><tr><th>Diameter</th><th>Gauge</th><th>Thickness</th></tr></thead><tbody>";
+    GAUGES.forEach(function (g) {
+      var hit = diaIn >= g.lo - 0.5 && diaIn <= g.hi + 0.5;
+      rows += '<tr' + (hit ? ' style="color:var(--accent);font-weight:700"' : '') + '><td>' +
+        g.lo + "–" + g.hi + "″ (" + Math.round(g.lo * 25.4) + "–" + Math.round(g.hi * 25.4) + " mm)" +
+        "</td><td>" + g.ga + "</td><td>" + g.th + "</td></tr>";
+    });
+    rows += "</tbody>";
+    tbl.innerHTML = rows;
+  }
+
+  $("af-dia").addEventListener("input", calcAirflow);
+  $("af-cfm").addEventListener("input", function () { afLast = "cfm"; calcAirflow(); });
+  $("af-vel").addEventListener("input", function () { afLast = "vel"; calcAirflow(); });
+  ["af-type", "af-angle"].forEach(function (id) { $(id).addEventListener("change", calcAirflow); });
+
+  // keep pipe diameter in sync across all tabs — change it anywhere, every tab revalues
+  var DIA_IDS = ["off-dia", "mi-dia", "to-dia", "af-dia"];
+  DIA_IDS.forEach(function (id) {
+    $(id).addEventListener("input", function () {
+      var v = this.value;
+      DIA_IDS.forEach(function (other) { if (other !== id) $(other).value = v; });
+      calcOffset(); calcMiter(); calcTakeout(); calcAirflow();
+    });
+  });
+
+  calcOffset();
+  calcMiter();
+  calcTakeout();
+  calcAirflow();
+})();
+</script>
+</body>
+</html>

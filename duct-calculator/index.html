@@ -380,6 +380,13 @@
         </div>
         <div class="row2">
           <div>
+            <label for="af-vel">Velocity (FPM)</label>
+            <input type="number" id="af-vel" step="any" min="0">
+          </div>
+          <div></div>
+        </div>
+        <div class="row2">
+          <div>
             <label for="af-type">Fitting type (for pressure loss)</label>
             <select id="af-type">
               <option value="smooth" selected>Pressed / smooth elbow (R/D ≈ 1.5)</option>
@@ -407,8 +414,11 @@
           Straight-duct friction uses the standard galvanized duct equation
           0.109136 × CFM<sup>1.9</sup> ÷ D<sup>5.02</sup> per 100 ft. A fitting's loss is its
           coefficient C × VP — smoother, longer-radius fittings have lower C. A rolling offset
-          has <strong>two</strong> fittings, so double the fitting loss. The pipe diameter is
-          synced with the other tabs — change it anywhere and this tab revalues.
+          has <strong>two</strong> fittings, so double the fitting loss.
+          <strong>CFM and velocity work both ways</strong> — enter either one and the other is
+          calculated. Whichever you typed last is held when you change pipe size: hold a CFM and
+          watch velocity move, or hold a design velocity (say 1500 FPM) and step through pipe
+          sizes to see the CFM each size carries. Diameter is synced with the other tabs.
         </div>
       </div>
 
@@ -1330,8 +1340,10 @@
 
   function fmtNum(v, dec) { return isFinite(v) ? v.toFixed(dec) : "—"; }
 
+  var afLast = "cfm"; // which of CFM / velocity the user entered last — that one is held
+
   function calcAirflow() {
-    var dia = num("af-dia"), cfm = num("af-cfm");
+    var dia = num("af-dia"), cfm = num("af-cfm"), vel = num("af-vel");
     var type = $("af-type").value, a = parseFloat($("af-angle").value);
     var err = $("af-err"), out = $("af-results"), tbl = $("af-gauge");
     err.textContent = "";
@@ -1344,14 +1356,23 @@
     var area = Math.PI * Math.pow(diaIn / 12, 2) / 4; // sq ft
     var C = C90[type] * angleFactor(a);
 
+    // two-way: hold whichever value was entered last, revalue the other
+    if (afLast === "vel" && isFinite(vel) && vel > 0) {
+      cfm = vel * area;
+      $("af-cfm").value = Math.round(cfm);
+    } else if (isFinite(cfm) && cfm > 0) {
+      $("af-vel").value = Math.round(cfm / area);
+    }
+
     var html = "";
     html += resultRow("Cross-section area", fmtNum(area, 3) + " sq ft");
     if (isFinite(cfm) && cfm > 0) {
       var V = cfm / area;                      // FPM
       var VP = Math.pow(V / 4005, 2);          // in. w.g.
       var fric = 0.109136 * Math.pow(cfm, 1.9) / Math.pow(diaIn, 5.02); // in. w.g. / 100 ft
-      html += resultRow("Velocity at " + cfm + " CFM",
-        Math.round(V) + " FPM (" + fmtNum(V * 0.00508, 1) + " m/s)", true);
+      html += resultRow("Airflow", Math.round(cfm) + " CFM", afLast === "vel");
+      html += resultRow("Velocity",
+        Math.round(V) + " FPM (" + fmtNum(V * 0.00508, 1) + " m/s)", afLast !== "vel");
       html += resultRow("Velocity pressure (VP)", fmtNum(VP, 3) + "″ w.g.");
       html += resultRow("Straight duct friction", fmtNum(fric, 3) + "″ w.g. per 100 ft");
       html += resultRow("Fitting loss coefficient (C), " + a + "° " +
@@ -1360,7 +1381,7 @@
       html += resultRow("Pressure loss through this fitting (C × VP)",
         fmtNum(C * VP, 3) + "″ w.g.", true);
     } else {
-      html += resultRow("Velocity", "enter CFM above");
+      html += resultRow("Velocity", "enter CFM or FPM above");
     }
     html += resultRow("CFM at 1000 FPM (quiet)", Math.round(area * 1000) + " CFM");
     html += resultRow("CFM at 1500 FPM (typical main)", Math.round(area * 1500) + " CFM");
@@ -1378,7 +1399,9 @@
     tbl.innerHTML = rows;
   }
 
-  ["af-dia", "af-cfm"].forEach(function (id) { $(id).addEventListener("input", calcAirflow); });
+  $("af-dia").addEventListener("input", calcAirflow);
+  $("af-cfm").addEventListener("input", function () { afLast = "cfm"; calcAirflow(); });
+  $("af-vel").addEventListener("input", function () { afLast = "vel"; calcAirflow(); });
   ["af-type", "af-angle"].forEach(function (id) { $(id).addEventListener("change", calcAirflow); });
 
   // keep pipe diameter in sync across all tabs — change it anywhere, every tab revalues

@@ -428,6 +428,20 @@
       </div>
 
       <div class="card full">
+        <h2>Pipe CFM capacity chart</h2>
+        <div class="results" style="margin-bottom:6px"><div class="item">
+          <span class="k">Your pipe</span><span class="v hl" id="af-capnote">—</span>
+        </div></div>
+        <div style="overflow-x:auto"><table id="af-capacity"></table></div>
+        <div class="hint">
+          Built-in capacity database for standard spiral pipe sizes — CFM carried at each
+          velocity (CFM = area × FPM). The row for the pipe size you entered is highlighted and
+          the whole chart re-keys automatically whenever the diameter changes in any tab.
+          Works offline; no lookup needed.
+        </div>
+      </div>
+
+      <div class="card full">
         <h2 class="warn">Typical spiral pipe gauge schedule (galvanized)</h2>
         <table id="af-gauge"></table>
         <div class="hint">
@@ -1340,6 +1354,11 @@
 
   function fmtNum(v, dec) { return isFinite(v) ? v.toFixed(dec) : "—"; }
 
+  // built-in CFM capacity database: standard spiral pipe sizes x common velocities
+  var STD_SIZES = [3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 42, 48, 54, 60];
+  var CAP_VELS = [1000, 1200, 1500, 2000, 2500, 3000];
+  function pipeArea(dIn) { return Math.PI * Math.pow(dIn / 12, 2) / 4; } // sq ft
+
   var afLast = "cfm"; // which of CFM / velocity the user entered last — that one is held
 
   function calcAirflow() {
@@ -1383,10 +1402,32 @@
     } else {
       html += resultRow("Velocity", "enter CFM or FPM above");
     }
-    html += resultRow("CFM at 1000 FPM (quiet)", Math.round(area * 1000) + " CFM");
-    html += resultRow("CFM at 1500 FPM (typical main)", Math.round(area * 1500) + " CFM");
-    html += resultRow("CFM at 2000 FPM (max commercial)", Math.round(area * 2000) + " CFM");
+    var diaLabel = "Ø " + (Math.round(diaIn * 100) / 100) + "″";
+    html += resultRow(diaLabel + " at 1000 FPM (quiet)", Math.round(area * 1000) + " CFM");
+    html += resultRow(diaLabel + " at 1500 FPM (typical main)", Math.round(area * 1500) + " CFM", true);
+    html += resultRow(diaLabel + " at 2000 FPM (max commercial)", Math.round(area * 2000) + " CFM");
     out.innerHTML = html;
+
+    // capacity chart from the built-in database, re-keyed to the entered diameter
+    var nearest = STD_SIZES[0];
+    STD_SIZES.forEach(function (s) {
+      if (Math.abs(s - diaIn) < Math.abs(nearest - diaIn)) nearest = s;
+    });
+    $("af-capnote").textContent = diaLabel + " carries " + Math.round(area * 1000) + "–" +
+      Math.round(area * 2000) + " CFM at 1000–2000 FPM";
+    var cap = "<thead><tr><th>Pipe Ø</th>";
+    CAP_VELS.forEach(function (v) { cap += "<th>" + v + " FPM</th>"; });
+    cap += "</tr></thead><tbody>";
+    STD_SIZES.forEach(function (s) {
+      var ar = pipeArea(s);
+      var hit = s === nearest;
+      cap += "<tr" + (hit ? ' style="color:var(--accent);font-weight:700"' : "") + "><td>" +
+        s + "″" + (hit ? " ◀" : "") + "</td>";
+      CAP_VELS.forEach(function (v) { cap += "<td>" + Math.round(ar * v).toLocaleString() + "</td>"; });
+      cap += "</tr>";
+    });
+    cap += "</tbody>";
+    $("af-capacity").innerHTML = cap;
 
     var rows = "<thead><tr><th>Diameter</th><th>Gauge</th><th>Thickness</th></tr></thead><tbody>";
     GAUGES.forEach(function (g) {
@@ -1407,11 +1448,14 @@
   // keep pipe diameter in sync across all tabs — change it anywhere, every tab revalues
   var DIA_IDS = ["off-dia", "mi-dia", "to-dia", "af-dia"];
   DIA_IDS.forEach(function (id) {
-    $(id).addEventListener("input", function () {
-      var v = this.value;
+    function syncDia() {
+      var v = $(id).value;
       DIA_IDS.forEach(function (other) { if (other !== id) $(other).value = v; });
       calcOffset(); calcMiter(); calcTakeout(); calcAirflow();
-    });
+    }
+    // both events: some mobile keyboards only commit the value on change/blur
+    $(id).addEventListener("input", syncDia);
+    $(id).addEventListener("change", syncDia);
   });
 
   calcOffset();

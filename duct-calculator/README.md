@@ -52,7 +52,10 @@ Reference data for the size you're running:
   (standard galvanized duct equation `0.109136 × CFM^1.9 ÷ D^5.02`)
 - **Fitting pressure loss** — approximate loss coefficients (C) for pressed,
   5-gore, 3-gore, and mitered elbows at any standard angle, times VP
-- **CFM capacity** of the pipe at 1000 / 1500 / 2000 FPM
+- **CFM capacity** of the pipe at 1000 / 1500 / 2000 FPM, labeled with the
+  current diameter, plus a built-in capacity chart for all standard spiral
+  sizes (3–60″) at 1000–3000 FPM with the entered size highlighted — the
+  whole tab re-keys automatically whenever the diameter changes in any tab
 - **Typical spiral pipe gauge schedule** (galvanized, SMACNA-style) with the
   current diameter highlighted, plus rule-of-thumb velocity ranges
 
